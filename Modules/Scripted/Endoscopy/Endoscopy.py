@@ -310,7 +310,9 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         # This can be used for example to show a reformatted slice
         # using with SlicerIGT extension's VolumeResliceDriver module.
         import numpy as np
+        # TODO: Split this next statement into two so that we compute focalPointPosition-cameraPosition only once.
         zVec = (focalPointPosition - cameraPosition) / np.linalg.norm(focalPointPosition - cameraPosition)
+        # TODO: This isn't yVec.  Eliminate this next statement and use self.pathPlaneNormal in the following statement.
         yVec = self.pathPlaneNormal
         xVec = np.cross(yVec, zVec)
         xVec /= np.linalg.norm(xVec)
@@ -324,6 +326,11 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         toParent.SetElement(0, 2, zVec[0])
         toParent.SetElement(1, 2, zVec[1])
         toParent.SetElement(2, 2, zVec[2])
+
+        # TODO: Via simple matrix4x4 multiplication (cameraTransform * toParent), apply the
+        # self.pathCameraTransform[pathPointIndex] transform to move the camera (translation and/or orientation)
+        # according to the user's specification.  The user specifies (directly or via interpolation) the transformation
+        # relative to the default Endoscopy orientation just calculated.
 
         self.transform.SetMatrixTransformToParent(toParent)
 
@@ -365,9 +372,12 @@ class EndoscopyComputePath:
                 self.fids.SetNumberOfPointsPerInterpolatingSegment(originalPointsPerSegment)
             # Get it as a numpy array as an independent copy
             self.path = vtk.util.numpy_support.vtk_to_numpy(resampledPoints.GetData())
+            # TODO: We are able to set self.pathIndices when we process vtkMRMLMarkupsFiducialNode below. How do we set
+            # it in the present case for vtkMRMLMarkupsCurveNode and vtkMRMLMarkupsClosedCurveNode?
             return
 
         # hermite interpolation functions
+        # TODO: flake8 would complain that it is better to use `@staticmethod def` than to name a lambda in this way.
         self.h00 = lambda t: 2 * t**3 - 3 * t**2 + 1
         self.h10 = lambda t: t**3 - 2 * t**2 + t
         self.h01 = lambda t: -2 * t**3 + 3 * t**2
@@ -386,8 +396,14 @@ class EndoscopyComputePath:
             self.p = numpy.zeros((n, 3))
             for i in range(n):
                 coord = [0.0, 0.0, 0.0]
+                # TODO: Simply use self.p[i] directly in the next statement, avoiding coord.
                 self.fids.GetNthControlPointPositionWorld(i, coord)
                 self.p[i] = coord
+
+        # TODO: Eliminate creating the fm variable.  Instead do something direct like:
+        # self.m[0] = p[1] - p[0]
+        # self.m[1 : n - 1] = (p[2:n] - p[0 : n - 2]) / 2
+        # self.m[n - 1] = p[n - 1] - p[n - 2]
 
         # calculate the tangent vectors
         # - fm is forward difference
@@ -405,7 +421,9 @@ class EndoscopyComputePath:
         self.m[n - 1] = fm[n - 2]
 
         self.path = [self.p[0]]
+        self.pathIndices = [(0, 0.0)]  # (segment, t)
         self.calculatePath()
+        self.interpolateCameraTransforms()
 
     def calculatePath(self):
         """ Generate a flight path for of steps of length dl """
@@ -419,6 +437,19 @@ class EndoscopyComputePath:
         segment = 0  # which first point of current segment
         t = 0  # parametric current parametric increment
         remainder = 0  # how much of dl isn't included in current step
+        # TODO: The following loop doesn't handle the case that a remainder may require advancing the segment index more
+        # than once.  Instead: start with `self.path = []` rather than `self.path = [self.p[0]]` above. Then use
+        # something like:
+
+        # maxSegment = self.n - 2  # number of segments is one less than the number of points
+        # while remainder == 0.0:
+        #     self.path.append(p)
+        #     self.pathIndices.append((segment, t))
+        #     t, p, remainder = self.step(segment, t, self.dl)
+        #     while remainder > 0.0 and segment < maxSegment:
+        #         segment += 1
+        #         t, p, remainder = self.step(segment, 0, remainder)
+
         while segment < n - 1:
             t, p, remainder = self.step(segment, t, self.dl)
             if remainder != 0 or t == 1.:
@@ -427,6 +458,7 @@ class EndoscopyComputePath:
                 if segment < n - 1:
                     t, p, remainder = self.step(segment, t, remainder)
             self.path.append(p)
+            self.pathIndices.append((segment, t))
 
     def point(self, segment, t):
         return (self.h00(t) * self.p[segment] +
@@ -443,6 +475,32 @@ class EndoscopyComputePath:
             this is the amount of world space not covered by step
         """
         import numpy.linalg
+
+        # TODO: This apparently works so that's an argument to not change it.  Nonetheless, a binary search would be
+        # simpler, be guaranteed to terminate in 20 iterations (many fewer than 500), and be easier to "prove correct by
+        # reading" than the current implementation:
+
+        # pRecent = self.path[-1]  # most recent element in path
+        # pLast = self.p[segment + 1]
+        # dLast = numpy.linalg.norm(pLast - pRecent)
+        # if dLast < dl:
+        #     # When curvature is tight, it is possible that an intermediate point is more distant, but ignore that.
+        #     response = (None, None, dl - dLast)
+        # else:
+        #     # Because dLast > dl we can do a binary search
+        #     tLow = t
+        #     tHigh = 1.0
+        #     tMid = (tLow + tHigh) / 2.0
+        #     pMid = self.point(segment, tMid)
+        #     while tHigh - tLow > 1e-6:
+        #         if numpy.linalg.norm(pMid - pRecent) < dl:
+        #             tLow = tMid
+        #         else:
+        #             tHigh = tMid
+        #         tMid = (tLow + tHigh) / 2.0
+        #         pMid = self.point(segment, tMid)
+        #     response = (tMid, pMid, 0.0)
+
         p0 = self.path[self.path.__len__() - 1]  # last element in path
         remainder = 0
         ratio = 100
@@ -464,6 +522,42 @@ class EndoscopyComputePath:
             remainder = numpy.linalg.norm(p1 - pguess)
             pguess = p1
         return (t1, pguess, remainder)
+
+    def interpolateCameraTransforms(self):
+        # TODO: This approach works for the vtkMRMLMarkupsFiducialNode case.  We need to handle the
+        # vtkMRMLMarkupsCurveNode / vtkMRMLMarkupsClosedCurveNode case too, which is more difficult because it doesn't
+        # (yet) provide us self.pathIndices information.
+
+        # TODO: The new variable names self.pCameraTransform, self.pathCameraTransform, and self.pathIndices could
+        # probably be clearer.
+
+        # TODO: Set `self.pCameraTransform` by getting the data from somewhere.  It is a list of (index, cameraTransform)
+        # pairs, where index is the same index that makes self.p[index, :] the corresponding point in the self.p array.
+        # (Note that index is not the position within the finer-grained self.path list.)  Not all index values need be
+        # present.  Furthermore, if the first or last index value is missing, the associated cameraTransform will be
+        # assumed to be no translation and no rotation with respect to the Endoscopy default camera position.  Other
+        # missing values will be interpolated.
+        pass
+
+        # TODO: Convert all supplied self.pCameraTransform to be relative the default Endoscopy camera transform.
+        pass
+
+        # TODO: Prepend and append the identity transform if they are missing.
+        pass
+
+        # TODO: Interpolate transformations to fill in other missing 'index' values.  (Recall this is for the self.p
+        # points, not the self.path points.)  In order to do interpolation, we have to decide on the appropriate
+        # proportions.  We can assume that each segment is of equal length; e.g. the interpolation between the
+        # cameraTransform for self.p[5] and the cameraTransform for self.p[7], to get the cameraTransform for self.p[6],
+        # would assume that self.p[6] is halfway between self.p[5] and self.p[7].  Alternatively, we could use distances
+        # such as numpy.linalg.norm(self.p[6]-self.p[5]) and numpy.linalg.norm(self.p[7]-self.p[6]).  Possibly, some
+        # other approaches.
+        pass
+
+        # TODO: Set `self.pathCameraTransform`, which is the interpolation of the cameraTransforms associated with the
+        # self.p points to get the cameraTransforms associated with the self.path points, using the self.pathIndices
+        # information for the interpolation lengths.
+        pass
 
 
 class EndoscopyPathModel:

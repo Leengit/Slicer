@@ -357,7 +357,7 @@ void vtkMRMLCameraNode::ProcessMRMLEvents ( vtkObject* caller,
      * Since Pn = Tn * Po
      * and Tn = Td * Ta
      * then
-     * Td = Ta-1 * Tn
+     * Td = Ta^(-1) * Tn
      * and
      * Pn = Td * Pa
      * then we save Tn as Ta for next time
