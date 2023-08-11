@@ -21,7 +21,7 @@ class Endoscopy(ScriptedLoadableModule):
         self.parent.title = "Endoscopy"
         self.parent.categories = ["Endoscopy"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Steve Pieper (Isomics)"]
+        self.parent.contributors = ["Steve Pieper (Isomics)", "Harald Scheirich (Kitware)", "Lee Newberg (Kitware)"]
         self.parent.helpText = """
 Create a path model as a spline interpolation of a set of fiducial points.
 Pick the Camera to be modified by the path and the Fiducial List defining the control points.
@@ -63,6 +63,9 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         self.timer.connect('timeout()', self.flyToNext)
 
     def setup(self):
+        # TODO: Also set up GUI for camera orientations (and translations?) during fly through.  See "Files Changed" in
+        # https://github.com/Slicer/Slicer/pull/6541/.
+
         ScriptedLoadableModuleWidget.setup(self)
 
         # Path collapsible button
@@ -526,10 +529,14 @@ class EndoscopyComputePath:
     def interpolateCameraTransforms(self):
         # TODO: This approach works for the vtkMRMLMarkupsFiducialNode case.  We need to handle the
         # vtkMRMLMarkupsCurveNode / vtkMRMLMarkupsClosedCurveNode case too, which is more difficult because it doesn't
-        # (yet) provide us self.pathIndices information.
+        # (yet) provide us self.pathIndices information.  Likely we will use Get/
+        # SetNthControlPoint/GetNthControlPoint(), Get/ SetNthControlPointOrientationMatrix(), and/or Get/
+        # SetNthControlPointOrientationMatrixWorld().
 
         # TODO: The new variable names self.pCameraTransform, self.pathCameraTransform, and self.pathIndices could
         # probably be clearer.
+
+        # TODO: Likely each of the following steps should be its own subroutine.
 
         # TODO: Set `self.pCameraTransform` by getting the data from somewhere.  It is a list of (index, cameraTransform)
         # pairs, where index is the same index that makes self.p[index, :] the corresponding point in the self.p array.
@@ -558,6 +565,26 @@ class EndoscopyComputePath:
         # self.p points to get the cameraTransforms associated with the self.path points, using the self.pathIndices
         # information for the interpolation lengths.
         pass
+
+    def ToQuaternion(xVec, yVec, zVec):
+        """
+        Converts system of axes to quaternion
+        """
+        matrix = vtk.vtkMatrix3x3()
+
+        matrix.SetElement(0, 0, xVec[0])
+        matrix.SetElement(1, 0, xVec[1])
+        matrix.SetElement(2, 0, xVec[2])
+        matrix.SetElement(0, 1, yVec[0])
+        matrix.SetElement(1, 1, yVec[1])
+        matrix.SetElement(2, 1, yVec[2])
+        matrix.SetElement(0, 2, zVec[0])
+        matrix.SetElement(1, 2, zVec[1])
+        matrix.SetElement(2, 2, zVec[2])
+
+        result = vtk.Quaternion()
+        vtk.vtkMath.Matrix3x3ToQuaternion(matrix, result)
+        return result
 
 
 class EndoscopyPathModel:
