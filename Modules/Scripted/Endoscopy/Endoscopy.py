@@ -1,9 +1,10 @@
 import ctk
+import numpy as np
 import qt
+import slicer
 import vtk
 import vtk.util.numpy_support
 
-import slicer
 from slicer.ScriptedLoadableModule import *
 
 
@@ -287,58 +288,62 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         self.frameSlider.value = nextStep
 
     def flyTo(self, pathPointIndex):
-        """ Apply the pathPointIndex-th step in the path to the global camera"""
-
-        if self.path is None:
+        if not hasattr(self, "resampledCurve"):
             return
 
-        pathPointIndex = int(pathPointIndex)
-        cameraPosition = self.path[pathPointIndex]
-        wasModified = self.cameraNode.StartModify()
+        defaultOrientation = np.zeros((4,))
+        self.GetDefaultOrientation(pathPointIndex, defaultOrientation)
 
-        self.camera.SetPosition(cameraPosition)
-        focalPointPosition = self.path[pathPointIndex + 1]
-        self.camera.SetFocalPoint(*focalPointPosition)
-        self.camera.OrthogonalizeViewUp()
+        relativeOrientation = self.cameraRelativeOrientations[pathPointIndex]
 
+        resultOrientation = np.zeros((4,))
+        self.MultiplyOrientations(relativeOrientation, defaultOrientation, resultOrientation)
+
+        resultQuaternion = vtk.vtkQuaternion[np.float64](*resultOrientation)
+        resultMatrix = np.zeros((3, 3))
+        resultQuaternion.ToMatrix3x3(resultMatrix)
+
+        # Build a 4x4 matrix from the 3x3 matrix and the camera position
         toParent = vtk.vtkMatrix4x4()
-        self.transform.GetMatrixTransformToParent(toParent)
+        for j in range(3):
+            for i in range(3):
+                toParent.SetElement(i, j, resultMatrix[i, j])
+            toParent.SetElement(3, j, 0.0)
+
+        cameraPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         toParent.SetElement(0, 3, cameraPosition[0])
         toParent.SetElement(1, 3, cameraPosition[1])
         toParent.SetElement(2, 3, cameraPosition[2])
+        toParent.SetElement(3, 3, 1.0)
 
-        # Set up transform orientation component so that
-        # Z axis is aligned with view direction and
-        # Y vector is aligned with the curve's plane normal.
-        # This can be used for example to show a reformatted slice
-        # using with SlicerIGT extension's VolumeResliceDriver module.
-        import numpy as np
-        # TODO: Split this next statement into two so that we compute focalPointPosition-cameraPosition only once.
-        zVec = (focalPointPosition - cameraPosition) / np.linalg.norm(focalPointPosition - cameraPosition)
-        # TODO: This isn't yVec.  Eliminate this next statement and use self.pathPlaneNormal in the following statement.
-        yVec = self.pathPlaneNormal
-        xVec = np.cross(yVec, zVec)
-        xVec /= np.linalg.norm(xVec)
-        yVec = np.cross(zVec, xVec)
-        toParent.SetElement(0, 0, xVec[0])
-        toParent.SetElement(1, 0, xVec[1])
-        toParent.SetElement(2, 0, xVec[2])
-        toParent.SetElement(0, 1, yVec[0])
-        toParent.SetElement(1, 1, yVec[1])
-        toParent.SetElement(2, 1, yVec[2])
-        toParent.SetElement(0, 2, zVec[0])
-        toParent.SetElement(1, 2, zVec[1])
-        toParent.SetElement(2, 2, zVec[2])
-
-        # TODO: Via simple matrix4x4 multiplication (cameraTransform * toParent), apply the
-        # self.pathCameraTransform[pathPointIndex] transform to move the camera (translation and/or orientation)
-        # according to the user's specification.  The user specifies (directly or via interpolation) the transformation
-        # relative to the default Endoscopy orientation just calculated.
-
+        # Work on camera and cameraNode
+        wasModified = self.cameraNode.StartModify()
+        focalPointPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
+        self.camera.SetPosition(cameraPosition)
+        self.camera.SetFocalPoint(*focalPointPosition)
+        self.camera.OrthogonalizeViewUp()
         self.transform.SetMatrixTransformToParent(toParent)
-
         self.cameraNode.EndModify(wasModified)
         self.cameraNode.ResetClippingRange()
+
+    # TODO: Make this accessible to all callers
+    @staticmethod
+    def MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation):
+        # TODO: Surely there is a better way.
+        rightQuaternion = vtk.vtkQuaternion[np.float64](*rightOrientation)
+        rightMatrix = np.zeros((3, 3))
+        rightQuaternion.ToMatrix3x3(rightMatrix)
+
+        leftQuaternion = vtk.vtkQuaternion[np.float64](*leftOrientation)
+        leftMatrix = np.zeros((3, 3))
+        leftQuaternion.ToMatrix3x3(leftMatrix)
+
+        resultMatrix = np.matmul(leftMatrix, rightMatrix)
+        resultQuaternion = vtk.vtkQuaternion[np.float64]()
+        resultQuaternion.FromMatrix3x3(resultMatrix)
+        resultQuaternion.Get(resultOrientation)
 
 
 class EndoscopyComputePath:
@@ -354,217 +359,154 @@ class EndoscopyComputePath:
     """
 
     def __init__(self, fiducialListNode, dl=0.5):
-        import numpy
         self.dl = dl  # desired world space step size (in mm)
-        self.dt = dl  # current guess of parametric stepsize
-        self.fids = fiducialListNode
 
-        # Already a curve, just get the points, sampled at equal distances.
-        if (self.fids.GetClassName() == "vtkMRMLMarkupsCurveNode"
-                or self.fids.GetClassName() == "vtkMRMLMarkupsClosedCurveNode"):
-            # Temporarily increase the number of points per segment, to get a very smooth curve
-            pointsPerSegment = int(self.fids.GetCurveLengthWorld() / self.dl / self.fids.GetNumberOfControlPoints()) + 1
-            originalPointsPerSegment = self.fids.GetNumberOfPointsPerInterpolatingSegment()
-            if originalPointsPerSegment < pointsPerSegment:
-                self.fids.SetNumberOfPointsPerInterpolatingSegment(pointsPerSegment)
-            # Get equidistant points
-            resampledPoints = vtk.vtkPoints()
-            slicer.vtkMRMLMarkupsCurveNode.ResamplePoints(self.fids.GetCurvePointsWorld(), resampledPoints, self.dl, self.fids.GetCurveClosed())
-            # Restore original number of pointsPerSegment
-            if originalPointsPerSegment < pointsPerSegment:
-                self.fids.SetNumberOfPointsPerInterpolatingSegment(originalPointsPerSegment)
-            # Get it as a numpy array as an independent copy
-            self.path = vtk.util.numpy_support.vtk_to_numpy(resampledPoints.GetData())
-            # TODO: We are able to set self.pathIndices when we process vtkMRMLMarkupsFiducialNode below. How do we set
-            # it in the present case for vtkMRMLMarkupsCurveNode and vtkMRMLMarkupsClosedCurveNode?
+        if not (
+            self.SetCurveFromInput(fiducialListNode)
+            and self.SetCameraPositionsFromInputCurve()
+            and self.SetCameraOrientationsFromInputCurve()
+        ):
+            self.IndicateFailure()
             return
 
-        # hermite interpolation functions
-        # TODO: flake8 would complain that it is better to use `@staticmethod def` than to name a lambda in this way.
-        self.h00 = lambda t: 2 * t**3 - 3 * t**2 + 1
-        self.h10 = lambda t: t**3 - 2 * t**2 + t
-        self.h01 = lambda t: -2 * t**3 + 3 * t**2
-        self.h11 = lambda t: t**3 - t**2
-
-        # n is the number of control points in the piecewise curve
-
-        if self.fids.GetClassName() == "vtkMRMLMarkupsFiducialNode":
-            # slicer4 Markups node
-            self.n = self.fids.GetNumberOfControlPoints()
-            n = self.n
-            if n == 0:
-                return
-            # get fiducial positions
-            # sets self.p
-            self.p = numpy.zeros((n, 3))
+    def SetCurveFromInput(self, fiducialListNode):
+        # Make a deep copy of the input information as a vtkMRMLMarkupsCurveNode.
+        self.inputCurve = slicer.vtkMRMLMarkupsCurveNode()
+        if (
+            fiducialListNode.GetClassName() == "vtkMRMLMarkupsFiducialNode"
+            or fiducialListNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
+            or fiducialListNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode"
+        ):
+            n = fiducialListNode.GetNumberOfControlPoints()
+            if n < 2:
+                # Need at least two points to make segments.
+                slicer.util.errorDisplay(
+                    "You need at least 2 control points in order to make a fly through.", "Run Error"
+                )
+                return False
+            coord = np.zeros((3,))
             for i in range(n):
-                coord = [0.0, 0.0, 0.0]
-                # TODO: Simply use self.p[i] directly in the next statement, avoiding coord.
-                self.fids.GetNthControlPointPositionWorld(i, coord)
-                self.p[i] = coord
+                fiducialListNode.GetNthControlPointPositionWorld(i, coord)
+                self.inputCurve.AddControlPointWorld(*coord)
+            if (
+                fiducialListNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
+                or fiducialListNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode"
+            ):
+                # Copy the orientation information
+                # TODO: How do we distinguish an identity orientation from a missing orientation?
+                orientation = np.zeros((4,))
+                for i in range(n):
+                    fiducialListNode.GetNthControlPointOrientation(i, orientation)
+                    self.inputCurve.SetNthControlPointOrientation(i, *orientation)
+            else:
+                # No orientation information is available.  Use identity matrix information for each control point.
+                # (Perhaps this is the default and we are not changing anything; check that.)
+                orientation = np.zeros((4,))
+                for i in range(n):
+                    self.inputCurve.SetNthControlPointOrientation(i, *orientation)
+                # TODO: Additionally (or instead), mark these orientations as missing
+        else:
+            # Unrecognized type for fiducialListNode
+            slicer.util.errorDisplay(
+                "The fiducialListNode must be a vtkMRMLMarkupsFiducialNode, vtkMRMLMarkupsCurveNode,"
+                + " or vtkMRMLMarkupsClosedCurveNode.  {fiducialListNode.GetClassName()} cannot be processed."
+                "Run Error"
+            )
+            return False
+        return True
 
-        # TODO: Eliminate creating the fm variable.  Instead do something direct like:
-        # self.m[0] = p[1] - p[0]
-        # self.m[1 : n - 1] = (p[2:n] - p[0 : n - 2]) / 2
-        # self.m[n - 1] = p[n - 1] - p[n - 2]
+    def SetCameraPositionsFromInputCurve(self):
+        # We now have the user's input as a curve.  Let's get equidistant points to represent the curve.
+        resampledPoints = vtk.vtkPoints()
+        slicer.vtkMRMLMarkupsCurveNode.ResamplePoints(
+            self.inputCurve.GetCurvePointsWorld(), resampledPoints, self.dl, self.inputCurve.GetCurveClosed()
+        )
+        self.n = resampledPoints.GetNumberOfPoints()
+        if self.n < 2:
+            slicer.util.errorDisplay(
+                "The curve is of length {self.inputCurve.GetCurveLengthWorld()}"
+                + " and is too short to support a step size of {self.dl}.",
+                "Run Error",
+            )
+            return False
 
-        # calculate the tangent vectors
-        # - fm is forward difference
-        # - m is average of in and out vectors
-        # - first tangent is out vector, last is in vector
-        # - sets self.m
-        n = self.n
-        fm = numpy.zeros((n, 3))
-        for i in range(0, n - 1):
-            fm[i] = self.p[i + 1] - self.p[i]
-        self.m = numpy.zeros((n, 3))
-        for i in range(1, n - 1):
-            self.m[i] = (fm[i - 1] + fm[i]) / 2.
-        self.m[0] = fm[0]
-        self.m[n - 1] = fm[n - 2]
+        # Make a curve from these resampledPoints
+        self.resampledCurve = slicer.vtkMRMLMarkupsCurveNode()
+        coord = np.zeros((3,))
+        for i in range(self.n):
+            resampledPoints.GetPoint(i, coord)
+            self.resampledCurve.AddControlPointWorld(*coord)
 
-        self.path = [self.p[0]]
-        self.pathIndices = [(0, 0.0)]  # (segment, t)
-        self.calculatePath()
-        self.interpolateCameraTransforms()
+        # Note: If we need that as numpy:
+        #     pointsAsNumpy = vtk.util.numpy_support.vtk_to_numpy(self.resampledCurve.GetData())
 
-    def calculatePath(self):
-        """ Generate a flight path for of steps of length dl """
-        #
-        # calculate the actual path
-        # - take steps of self.dl in world space
-        # -- if dl steps into next segment, take a step of size "remainder" in the new segment
-        # - put resulting points into self.path
-        #
-        n = self.n
-        segment = 0  # which first point of current segment
-        t = 0  # parametric current parametric increment
-        remainder = 0  # how much of dl isn't included in current step
-        # TODO: The following loop doesn't handle the case that a remainder may require advancing the segment index more
-        # than once.  Instead: start with `self.path = []` rather than `self.path = [self.p[0]]` above. Then use
-        # something like:
+        # TODO: What else for self.resampledCurve should be set?
 
-        # maxSegment = self.n - 2  # number of segments is one less than the number of points
-        # while remainder == 0.0:
-        #     self.path.append(p)
-        #     self.pathIndices.append((segment, t))
-        #     t, p, remainder = self.step(segment, t, self.dl)
-        #     while remainder > 0.0 and segment < maxSegment:
-        #         segment += 1
-        #         t, p, remainder = self.step(segment, 0, remainder)
+        return True
 
-        while segment < n - 1:
-            t, p, remainder = self.step(segment, t, self.dl)
-            if remainder != 0 or t == 1.:
-                segment += 1
-                t = 0
-                if segment < n - 1:
-                    t, p, remainder = self.step(segment, t, remainder)
-            self.path.append(p)
-            self.pathIndices.append((segment, t))
+    def SetCameraOrientationsFromInputCurve():
+        # Interpolate the camera orientations for our resampledPoints
 
-    def point(self, segment, t):
-        return (self.h00(t) * self.p[segment] +
-                self.h10(t) * self.m[segment] +
-                self.h01(t) * self.p[segment + 1] +
-                self.h11(t) * self.m[segment + 1])
+        # Find the camera orientations in the input curve
+        n = self.inputCurve.GetNumberOfControlPoints()
+        inputRelativeOrientations = vtk.vtkQuaternionInterpolator()
+        # TODO: set global parameters (e.g. spline vs. linear) for inputRelativeOrientations
+        for i in range(n):
+            # TODO: Figure out which ones are truly user-supplied and which ones are missing and keep only the former.
+            supplied = False
+            if supplied or i == 0 or i == n - 1:
+                distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, i)
+                orientation = np.zeros((4,))
+                if supplied:
+                    self.GetRelativeOrientation(i, orientation)
+                inputRelativeOrientations.AddQuaternion(distanceAlongInputCurve, *orientation)
 
-    def step(self, segment, t, dl):
-        """ Take a step of dl and return the path point and new t
-          return:
-          t = new parametric coordinate after step
-          p = point after step
-          remainder = if step results in parametric coordinate > 1.0, then
-            this is the amount of world space not covered by step
-        """
-        import numpy.linalg
+        # Find the places at which we wish to have orientations
+        for i in range(self.n):
+            distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, i)
+            orientation = np.zeros((4,))
+            inputRelativeOrientations.InterpolateQuaternion(distanceAlongResampledCurve, orientation)
+            self.cameraRelativeOrientations.append(orientation)
 
-        # TODO: This apparently works so that's an argument to not change it.  Nonetheless, a binary search would be
-        # simpler, be guaranteed to terminate in 20 iterations (many fewer than 500), and be easier to "prove correct by
-        # reading" than the current implementation:
+    def GetDefaultOrientation(self, i, orientation):
+        coord = np.zeros((3,))
+        cameraPosition = self.resampledCurve.GetNthControlPointPositionWorld(i, coord)
+        focalPoint = self.resampledCurve.GetNthControlPointPositionWorld(i + 1, coord)
+        zVec = focalPointPosition - cameraPosition
+        zVec /= np.linalg.norm(zVec)
+        xVec = np.cross(self.pathPlaneNormal, zVec)
+        xVec /= np.linalg.norm(xVec)
+        yVec = np.cross(zVec, xVec)
 
-        # pRecent = self.path[-1]  # most recent element in path
-        # pLast = self.p[segment + 1]
-        # dLast = numpy.linalg.norm(pLast - pRecent)
-        # if dLast < dl:
-        #     # When curvature is tight, it is possible that an intermediate point is more distant, but ignore that.
-        #     response = (None, None, dl - dLast)
-        # else:
-        #     # Because dLast > dl we can do a binary search
-        #     tLow = t
-        #     tHigh = 1.0
-        #     tMid = (tLow + tHigh) / 2.0
-        #     pMid = self.point(segment, tMid)
-        #     while tHigh - tLow > 1e-6:
-        #         if numpy.linalg.norm(pMid - pRecent) < dl:
-        #             tLow = tMid
-        #         else:
-        #             tHigh = tMid
-        #         tMid = (tLow + tHigh) / 2.0
-        #         pMid = self.point(segment, tMid)
-        #     response = (tMid, pMid, 0.0)
+        matrix = vtk.vtkMatrix3x3()
+        matrix.SetElement(0, 0, xVec[0])
+        matrix.SetElement(1, 0, xVec[1])
+        matrix.SetElement(2, 0, xVec[2])
+        matrix.SetElement(0, 1, yVec[0])
+        matrix.SetElement(1, 1, yVec[1])
+        matrix.SetElement(2, 1, yVec[2])
+        matrix.SetElement(0, 2, zVec[0])
+        matrix.SetElement(1, 2, zVec[1])
+        matrix.SetElement(2, 2, zVec[2])
+        quaternion = vtk.vtkQuaternion[np.float64]()
+        quaternion.FromMatrix3x3(matrix)
+        quaternion.Get(orientation)
 
-        p0 = self.path[self.path.__len__() - 1]  # last element in path
-        remainder = 0
-        ratio = 100
-        count = 0
-        while abs(1. - ratio) > 0.05:
-            t1 = t + self.dt
-            pguess = self.point(segment, t1)
-            dist = numpy.linalg.norm(pguess - p0)
-            ratio = self.dl / dist
-            self.dt *= ratio
-            if self.dt < 0.00000001:
-                return
-            count += 1
-            if count > 500:
-                return (t1, pguess, 0)
-        if t1 > 1.:
-            t1 = 1.
-            p1 = self.point(segment, t1)
-            remainder = numpy.linalg.norm(p1 - pguess)
-            pguess = p1
-        return (t1, pguess, remainder)
+    def GetRelativeOrientation(self, i, resultOrientation):
+        rightOrientation = np.zeros((4,))
+        self.GetDefaultOrientation(i, rightOrientation)
+        # Compute the inverse of rightOrientation by negating its angle of rotation.
+        rightOrientation[0] *= -1.0
 
-    def interpolateCameraTransforms(self):
-        # TODO: This approach works for the vtkMRMLMarkupsFiducialNode case.  We need to handle the
-        # vtkMRMLMarkupsCurveNode / vtkMRMLMarkupsClosedCurveNode case too, which is more difficult because it doesn't
-        # (yet) provide us self.pathIndices information.  Likely we will use Get/
-        # SetNthControlPoint/GetNthControlPoint(), Get/ SetNthControlPointOrientationMatrix(), and/or Get/
-        # SetNthControlPointOrientationMatrixWorld().
+        leftOrientation = np.zeros((4,))
+        self.inputCurve.GetNthControlPointOrientation(i, leftOrientation)
 
-        # TODO: The new variable names self.pCameraTransform, self.pathCameraTransform, and self.pathIndices could
-        # probably be clearer.
+        self.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
 
-        # TODO: Likely each of the following steps should be its own subroutine.
-
-        # TODO: Set `self.pCameraTransform` by getting the data from somewhere.  It is a list of (index, cameraTransform)
-        # pairs, where index is the same index that makes self.p[index, :] the corresponding point in the self.p array.
-        # (Note that index is not the position within the finer-grained self.path list.)  Not all index values need be
-        # present.  Furthermore, if the first or last index value is missing, the associated cameraTransform will be
-        # assumed to be no translation and no rotation with respect to the Endoscopy default camera position.  Other
-        # missing values will be interpolated.
-        pass
-
-        # TODO: Convert all supplied self.pCameraTransform to be relative the default Endoscopy camera transform.
-        pass
-
-        # TODO: Prepend and append the identity transform if they are missing.
-        pass
-
-        # TODO: Interpolate transformations to fill in other missing 'index' values.  (Recall this is for the self.p
-        # points, not the self.path points.)  In order to do interpolation, we have to decide on the appropriate
-        # proportions.  We can assume that each segment is of equal length; e.g. the interpolation between the
-        # cameraTransform for self.p[5] and the cameraTransform for self.p[7], to get the cameraTransform for self.p[6],
-        # would assume that self.p[6] is halfway between self.p[5] and self.p[7].  Alternatively, we could use distances
-        # such as numpy.linalg.norm(self.p[6]-self.p[5]) and numpy.linalg.norm(self.p[7]-self.p[6]).  Possibly, some
-        # other approaches.
-        pass
-
-        # TODO: Set `self.pathCameraTransform`, which is the interpolation of the cameraTransforms associated with the
-        # self.p points to get the cameraTransforms associated with the self.path points, using the self.pathIndices
-        # information for the interpolation lengths.
-        pass
+    def IndicateFailure(self):
+        # We cannot fly through if there is no self.resampledCurve.
+        if hasattr(self, "resampledCurve"):
+            del self.resampledCurve
 
     def ToQuaternion(xVec, yVec, zVec):
         """
@@ -687,8 +629,8 @@ class EndoscopyPathModel:
         Return a point, p, on the plane (the point-cloud centroid),
         and the normal, n.
         """
-        import numpy as np
-        from numpy.linalg import svd
+
+        from np.linalg import svd
         points = np.reshape(points, (np.shape(points)[0], -1))  # Collapse trialing dimensions
         assert points.shape[0] <= points.shape[1], f"There are only {points.shape[1]} points in {points.shape[0]} dimensions."
         ctr = points.mean(axis=1)
