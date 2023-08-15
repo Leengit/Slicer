@@ -495,9 +495,7 @@ class EndoscopyComputePath:
 
     @staticmethod
     def Matrix3x3ToQuaternion(matrix3x3, quaternion=np.zeros((4,))):
-        vtkQ = vtk.vtkQuaternion[np.float64]()
-        vtkQ.FromMatrix(matrix3x3)
-        vtkQ.Get(quaternion)
+        vtk.vtkMath.Matrix3x3ToQuaternion(matrix3x3, quaternion)
         return quaternion
 
     @staticmethod
@@ -516,9 +514,7 @@ class EndoscopyComputePath:
 
     @staticmethod
     def QuaternionToMatrix3x3(quaternion, matrix3x3=np.zeros((3, 3))):
-        vtkQ = vtk.vtkQuaternion[np.float64]()
-        vtkQ.Set(*quaternion)
-        vtkQ.ToMatrix(matrix3x3)
+        vtk.vtkMath.QuaternionToMatrix3x3(quaternion, matrix3x3)
         return matrix3x3
 
     @staticmethod
