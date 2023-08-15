@@ -14,9 +14,6 @@ Note:
 * `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
 """
 
-#
-# Endoscopy
-#
 
 class Endoscopy(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
@@ -45,10 +42,6 @@ This work is supported by PAR-07-249: R01CA131718 NA-MIC Virtual Colonoscopy
 NA-MIC, NAC, BIRN, NCIGT, and the Slicer Community.
 """
 
-
-#
-# qSlicerPythonModuleExampleWidget
-#
 
 class EndoscopyWidget(ScriptedLoadableModuleWidget):
     """Uses ScriptedLoadableModuleWidget base class, available at:
