@@ -7,6 +7,12 @@ import vtk.util.numpy_support
 
 from slicer.ScriptedLoadableModule import *
 
+"""
+Note:
+* `orientation` = (angle, *axis), where angle is in degrees and axis is the unit 3D-vector for the axis of rotation.
+* `quaternion` = (cos(angle/2), *axis * sin(angle/2))
+* `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
+"""
 
 #
 # Endoscopy
@@ -291,17 +297,18 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         if not hasattr(self, "resampledCurve"):
             return
 
-        defaultOrientation = np.zeros((4,))
-        self.GetDefaultOrientation(pathPointIndex, defaultOrientation)
+        cameraPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
+        focalPointPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
 
-        relativeOrientation = self.cameraRelativeOrientations[pathPointIndex]
-
-        resultOrientation = np.zeros((4,))
-        self.MultiplyOrientations(relativeOrientation, defaultOrientation, resultOrientation)
-
-        resultQuaternion = vtk.vtkQuaternion[np.float64](*resultOrientation)
-        resultMatrix = np.zeros((3, 3))
-        resultQuaternion.ToMatrix3x3(resultMatrix)
+        defaultOrientation = self.GetDefaultOrientation(pathPointIndex)
+        relativeOrientation = np.zeros((4,))
+        self.resampledCurve.GetNthControlPointOrientation(pathPointIndex, relativeOrientation)
+        resultMatrix = np.matmul(
+            EndoscopyPathModel.OrientationToMatrix3x3(relativeOrientation),
+            EndoscopyPathModel.OrientationToMatrix3x3(defaultOrientation),
+        )
 
         # Build a 4x4 matrix from the 3x3 matrix and the camera position
         toParent = vtk.vtkMatrix4x4()
@@ -310,8 +317,6 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
                 toParent.SetElement(i, j, resultMatrix[i, j])
             toParent.SetElement(3, j, 0.0)
 
-        cameraPosition = np.zeros((3,))
-        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         toParent.SetElement(0, 3, cameraPosition[0])
         toParent.SetElement(1, 3, cameraPosition[1])
         toParent.SetElement(2, 3, cameraPosition[2])
@@ -319,31 +324,12 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
 
         # Work on camera and cameraNode
         wasModified = self.cameraNode.StartModify()
-        focalPointPosition = np.zeros((3,))
-        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
-        self.camera.SetPosition(cameraPosition)
+        self.camera.SetPosition(*cameraPosition)
         self.camera.SetFocalPoint(*focalPointPosition)
         self.camera.OrthogonalizeViewUp()
         self.transform.SetMatrixTransformToParent(toParent)
         self.cameraNode.EndModify(wasModified)
         self.cameraNode.ResetClippingRange()
-
-    # TODO: Make this accessible to all callers
-    @staticmethod
-    def MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation):
-        # TODO: Surely there is a better way.
-        rightQuaternion = vtk.vtkQuaternion[np.float64](*rightOrientation)
-        rightMatrix = np.zeros((3, 3))
-        rightQuaternion.ToMatrix3x3(rightMatrix)
-
-        leftQuaternion = vtk.vtkQuaternion[np.float64](*leftOrientation)
-        leftMatrix = np.zeros((3, 3))
-        leftQuaternion.ToMatrix3x3(leftMatrix)
-
-        resultMatrix = np.matmul(leftMatrix, rightMatrix)
-        resultQuaternion = vtk.vtkQuaternion[np.float64]()
-        resultQuaternion.FromMatrix3x3(resultMatrix)
-        resultQuaternion.Get(resultOrientation)
 
 
 class EndoscopyComputePath:
@@ -388,29 +374,31 @@ class EndoscopyComputePath:
             for i in range(n):
                 fiducialListNode.GetNthControlPointPositionWorld(i, coord)
                 self.inputCurve.AddControlPointWorld(*coord)
+
+            # Copy all the orientation information to the new curve.
             if (
                 fiducialListNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
                 or fiducialListNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode"
             ):
-                # Copy the orientation information
-                # TODO: How do we distinguish an identity orientation from a missing orientation?
+                # TODO: How do we distinguish a user-supplied identity matrix from a user's request that the orientation
+                # for this position be computed via interpolation?  For the moment we assume that the user has supplied
+                # an orientation for every control point.
                 orientation = np.zeros((4,))
                 for i in range(n):
                     fiducialListNode.GetNthControlPointOrientation(i, orientation)
                     self.inputCurve.SetNthControlPointOrientation(i, *orientation)
             else:
-                # No orientation information is available.  Use identity matrix information for each control point.
-                # (Perhaps this is the default and we are not changing anything; check that.)
-                orientation = np.zeros((4,))
+                # TODO: No orientation information is available.  For the moment assume that the user effectively
+                # supplied the identity matrix for each control point.
+                orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 for i in range(n):
                     self.inputCurve.SetNthControlPointOrientation(i, *orientation)
-                # TODO: Additionally (or instead), mark these orientations as missing
         else:
             # Unrecognized type for fiducialListNode
             slicer.util.errorDisplay(
-                "The fiducialListNode must be a vtkMRMLMarkupsFiducialNode, vtkMRMLMarkupsCurveNode,"
-                + " or vtkMRMLMarkupsClosedCurveNode.  {fiducialListNode.GetClassName()} cannot be processed."
-                "Run Error"
+                "The fiducialListNode must be a vtkMRMLMarkupsFiducialNode, vtkMRMLMarkupsCurveNode, or"
+                + " vtkMRMLMarkupsClosedCurveNode.  {fiducialListNode.GetClassName()} cannot be processed.",
+                "Run Error",
             )
             return False
         return True
@@ -437,9 +425,6 @@ class EndoscopyComputePath:
             resampledPoints.GetPoint(i, coord)
             self.resampledCurve.AddControlPointWorld(*coord)
 
-        # Note: If we need that as numpy:
-        #     pointsAsNumpy = vtk.util.numpy_support.vtk_to_numpy(self.resampledCurve.GetData())
-
         # TODO: What else for self.resampledCurve should be set?
 
         return True
@@ -449,84 +434,109 @@ class EndoscopyComputePath:
 
         # Find the camera orientations in the input curve
         n = self.inputCurve.GetNumberOfControlPoints()
-        inputRelativeOrientations = vtk.vtkQuaternionInterpolator()
-        # TODO: set global parameters (e.g. spline vs. linear) for inputRelativeOrientations
+        quaternionInterpolator = vtk.vtkQuaternionInterpolator()
+        quaternionInterpolator.SetSearchMethod(0)  # binary search
+        quaternionInterpolator.SetInterpolationTypeToSpline()  # cubic rather than linear interpolation
         for i in range(n):
-            # TODO: Figure out which ones are truly user-supplied and which ones are missing and keep only the former.
-            supplied = False
+            # TODO: For the moment assume that all orientations have been supplied by the user.  This loop should
+            # instead include only user-supplied interpolations.  Those that are not supplied by the user, and thus are
+            # in need of being computed via interpolation, should not be supplied via .AddQuaternion().
+            supplied = True
             if supplied or i == 0 or i == n - 1:
                 distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, i)
-                orientation = np.zeros((4,))
+                orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
                     self.GetRelativeOrientation(i, orientation)
-                inputRelativeOrientations.AddQuaternion(distanceAlongInputCurve, *orientation)
+                quaternion = EndoscopyComputePath.OrientationToQuaternion(orientation)
+                quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, *quaternion)
 
         # Find the places at which we wish to have orientations
         for i in range(self.n):
             distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, i)
-            orientation = np.zeros((4,))
-            inputRelativeOrientations.InterpolateQuaternion(distanceAlongResampledCurve, orientation)
-            self.cameraRelativeOrientations.append(orientation)
+            quaternion = np.zeros((4,))
+            quaternionInterpolator.InterpolateQuaternion(distanceAlongResampledCurve, quaternion)
+            orientation = EndoscopyComputePath.QuaternionToOrientation(quaternion)
+            self.resampledCurve.SetNthControlPointOrientation(i, *orientation)
 
-    def GetDefaultOrientation(self, i, orientation):
-        coord = np.zeros((3,))
-        cameraPosition = self.resampledCurve.GetNthControlPointPositionWorld(i, coord)
-        focalPoint = self.resampledCurve.GetNthControlPointPositionWorld(i + 1, coord)
-        zVec = focalPointPosition - cameraPosition
-        zVec /= np.linalg.norm(zVec)
-        xVec = np.cross(self.pathPlaneNormal, zVec)
-        xVec /= np.linalg.norm(xVec)
-        yVec = np.cross(zVec, xVec)
+    def GetDefaultOrientation(self, i, orientation=None):
+        cameraPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(i, cameraPosition)
+        focalPointPosition = np.zeros((3,))
+        self.resampledCurve.GetNthControlPointPositionWorld(i + 1, focalPointPosition)
+        matrix3x3 = np.zeros((3, 3))
+        matrix3x3[:, 2] = focalPointPosition - cameraPosition
+        matrix3x3[:, 2] /= np.linalg.norm(matrix3x3[:, 2])
+        matrix3x3[:, 0] = np.cross(self.pathPlaneNormal, matrix3x3[:, 2])
+        matrix3x3[:, 0] /= np.linalg.norm(matrix3x3[:, 0])
+        matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
+        return EndoscopyComputePath.Matrix3x3ToOrientation(matrix3x3, orientation)
 
-        matrix = vtk.vtkMatrix3x3()
-        matrix.SetElement(0, 0, xVec[0])
-        matrix.SetElement(1, 0, xVec[1])
-        matrix.SetElement(2, 0, xVec[2])
-        matrix.SetElement(0, 1, yVec[0])
-        matrix.SetElement(1, 1, yVec[1])
-        matrix.SetElement(2, 1, yVec[2])
-        matrix.SetElement(0, 2, zVec[0])
-        matrix.SetElement(1, 2, zVec[1])
-        matrix.SetElement(2, 2, zVec[2])
-        quaternion = vtk.vtkQuaternion[np.float64]()
-        quaternion.FromMatrix3x3(matrix)
-        quaternion.Get(orientation)
-
-    def GetRelativeOrientation(self, i, resultOrientation):
-        rightOrientation = np.zeros((4,))
-        self.GetDefaultOrientation(i, rightOrientation)
+    def GetRelativeOrientation(self, i, resultOrientation=None):
+        rightOrientation = self.GetDefaultOrientation(i)
         # Compute the inverse of rightOrientation by negating its angle of rotation.
         rightOrientation[0] *= -1.0
 
         leftOrientation = np.zeros((4,))
         self.inputCurve.GetNthControlPointOrientation(i, leftOrientation)
 
-        self.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
+        return EndoscopyComputePath.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
 
     def IndicateFailure(self):
         # We cannot fly through if there is no self.resampledCurve.
         if hasattr(self, "resampledCurve"):
             del self.resampledCurve
 
-    def ToQuaternion(xVec, yVec, zVec):
-        """
-        Converts system of axes to quaternion
-        """
-        matrix = vtk.vtkMatrix3x3()
+    @staticmethod
+    def Matrix3x3ToOrientation(matrix3x3, orientation=np.zeros((4,))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.FromMatrix(matrix3x3)
+        vtkQ.GetRotationAngleAndAxis(orientation)
+        return orientation
 
-        matrix.SetElement(0, 0, xVec[0])
-        matrix.SetElement(1, 0, xVec[1])
-        matrix.SetElement(2, 0, xVec[2])
-        matrix.SetElement(0, 1, yVec[0])
-        matrix.SetElement(1, 1, yVec[1])
-        matrix.SetElement(2, 1, yVec[2])
-        matrix.SetElement(0, 2, zVec[0])
-        matrix.SetElement(1, 2, zVec[1])
-        matrix.SetElement(2, 2, zVec[2])
+    @staticmethod
+    def Matrix3x3ToQuaternion(matrix3x3, quaternion=np.zeros((4,))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.FromMatrix(matrix3x3)
+        vtkQ.Get(quaternion)
+        return quaternion
 
-        result = vtk.Quaternion()
-        vtk.vtkMath.Matrix3x3ToQuaternion(matrix, result)
-        return result
+    @staticmethod
+    def OrientationToMatrix3x3(orientation, matrix3x3=np.zeros((3, 3))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.SetRotationAngleAndAxis(*orientation)
+        vtkQ.ToMatrix(matrix3x3)
+        return matrix3x3
+
+    @staticmethod
+    def OrientationToQuaternion(orientation, quaternion=np.zeros((4,))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.SetRotationAngleAndAxis(*orientation)
+        vtkQ.Get(quaternion)
+        return quaternion
+
+    @staticmethod
+    def QuaternionToMatrix3x3(quaternion, matrix3x3=np.zeros((3, 3))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.Set(*quaternion)
+        vtkQ.ToMatrix(matrix3x3)
+        return matrix3x3
+
+    @staticmethod
+    def QuaternionToOrientation(quaternion, orientation=np.zeros((4,))):
+        vtkQ = vtk.vtkQuaternion[np.float64]()
+        vtkQ.Set(*quaternion)
+        vtkQ.GetRotationAngleAndAxis(orientation)
+        return orientation
+
+    @staticmethod
+    def MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation=None):
+        return EndoscopyComputePath.Matrix3x3ToOrientation(
+            np.matmul(
+                EndoscopyComputePath.OrientationToMatrix3x3(leftOrientation),
+                EndoscopyComputePath.OrientationToMatrix3x3(rightOrientation),
+            ),
+            resultOrientation,
+        )
 
 
 class EndoscopyPathModel:
