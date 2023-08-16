@@ -4,15 +4,7 @@ import qt
 import slicer
 import vtk
 import vtk.util.numpy_support
-
 from slicer.ScriptedLoadableModule import *
-
-"""
-Note:
-* `orientation` = (angle, *axis), where angle is in degrees and axis is the unit 3D-vector for the axis of rotation.
-* `quaternion` = (cos(angle/2), *axis * sin(angle/2))
-* `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
-"""
 
 
 class Endoscopy(ScriptedLoadableModule):
@@ -55,7 +47,7 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         self.cameraObserverTag = None
         # Flythough variables
         self.transform = None
-        self.path = None
+        self.resampledCurve = None
         self.camera = None
         self.skip = 0
         self.timer = qt.QTimer()
@@ -234,24 +226,25 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         fiducialsNode = self.inputFiducialsNodeSelector.currentNode()
         outputPathNode = self.outputPathNodeSelector.currentNode()
         print("Calculating Path...")
-        result = EndoscopyComputePath(fiducialsNode)
-        print("-> Computed path contains %d elements" % len(result.path))
+        self.logic = EndoscopyLogic(fiducialsNode)
+        numberOfControlPoints = self.logic.resampledCurve.GetNumberOfControlPoints()
+        print("-> Computed path contains %d elements" % numberOfControlPoints)
 
         print("Create Model...")
-        model = EndoscopyPathModel(result.path, fiducialsNode, outputPathNode)
+        model = EndoscopyPathModel(self.logic.resampledCurve, fiducialsNode, outputPathNode)
         print("-> Model created")
 
         # Update frame slider range
-        self.frameSlider.maximum = len(result.path) - 2
+        self.frameSlider.maximum = max(0, numberOfControlPoints - 2)
 
         # Update flythrough variables
         self.camera = self.camera
         self.transform = model.transform
-        self.pathPlaneNormal = model.planeNormal
-        self.path = result.path
+        self.planeNormal = self.logic.planeNormal
+        self.resampledCurve = self.logic.resampledCurve
 
         # Enable / Disable flythrough button
-        self.flythroughCollapsibleButton.enabled = len(result.path) > 0
+        self.flythroughCollapsibleButton.enabled = numberOfControlPoints > 1
 
     def frameSliderValueChanged(self, newValue):
         # print "frameSliderValueChanged:", newValue
@@ -282,25 +275,26 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
     def flyToNext(self):
         currentStep = self.frameSlider.value
         nextStep = currentStep + self.skip + 1
-        if nextStep > len(self.path) - 2:
+        if nextStep > self.logic.resampledCurve.GetNumberOfControlPoints() - 2:
             nextStep = 0
         self.frameSlider.value = nextStep
 
     def flyTo(self, pathPointIndex):
-        if not hasattr(self, "resampledCurve"):
+        if self.resampledCurve is None:
             return
 
+        pathPointIndex = int(pathPointIndex)
         cameraPosition = np.zeros((3,))
         self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
         self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
 
-        defaultOrientation = self.GetDefaultOrientation(pathPointIndex)
+        defaultOrientation = self.logic.GetDefaultOrientation(pathPointIndex)
         relativeOrientation = np.zeros((4,))
         self.resampledCurve.GetNthControlPointOrientation(pathPointIndex, relativeOrientation)
         resultMatrix = np.matmul(
-            EndoscopyPathModel.OrientationToMatrix3x3(relativeOrientation),
-            EndoscopyPathModel.OrientationToMatrix3x3(defaultOrientation),
+            EndoscopyLogic.OrientationToMatrix3x3(relativeOrientation),
+            EndoscopyLogic.OrientationToMatrix3x3(defaultOrientation),
         )
 
         # Build a 4x4 matrix from the 3x3 matrix and the camera position
@@ -325,16 +319,20 @@ class EndoscopyWidget(ScriptedLoadableModuleWidget):
         self.cameraNode.ResetClippingRange()
 
 
-class EndoscopyComputePath:
+class EndoscopyLogic:
     """Compute path given a list of fiducials.
     Path is stored in 'path' member variable as a numpy array.
     If a point list is received then curve points are generated using Hermite spline interpolation.
     See https://en.wikipedia.org/wiki/Cubic_Hermite_spline
 
     Example:
-      result = EndoscopyComputePath(fiducialListNode)
-      print "computer path has %d elements" % len(result.path)
+      self.logic = EndoscopyLogic(fiducialListNode)
+      print("computer path has %d elements" % self.logic.resampledCurve.GetNumberOfControlPoints())
 
+    Note:
+    * `orientation` = (angle, *axis), where angle is in degrees and axis is the unit 3D-vector for the axis of rotation.
+    * `quaternion` = (cos(angle/2), *axis * sin(angle/2))
+    * `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
     """
 
     def __init__(self, fiducialListNode, dl=0.5):
@@ -364,9 +362,13 @@ class EndoscopyComputePath:
                 )
                 return False
             coord = np.zeros((3,))
+            wasModified = self.inputCurve.StartModify()
             for i in range(n):
                 fiducialListNode.GetNthControlPointPositionWorld(i, coord)
                 self.inputCurve.AddControlPointWorld(*coord)
+            self.inputCurve.EndModify(wasModified)
+
+            # TODO: Do we need to add one more control point (and increment n) if this is a /closed/ curve?
 
             # Copy all the orientation information to the new curve.
             if (
@@ -377,15 +379,19 @@ class EndoscopyComputePath:
                 # for this position be computed via interpolation?  For the moment we assume that the user has supplied
                 # an orientation for every control point.
                 orientation = np.zeros((4,))
+                wasModified = self.inputCurve.StartModify()
                 for i in range(n):
                     fiducialListNode.GetNthControlPointOrientation(i, orientation)
                     self.inputCurve.SetNthControlPointOrientation(i, *orientation)
+                self.inputCurve.EndModify(wasModified)
             else:
                 # TODO: No orientation information is available.  For the moment assume that the user effectively
                 # supplied the identity matrix for each control point.
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
+                wasModified = self.inputCurve.StartModify()
                 for i in range(n):
                     self.inputCurve.SetNthControlPointOrientation(i, *orientation)
+                self.inputCurve.EndModify(wasModified)
         else:
             # Unrecognized type for fiducialListNode
             slicer.util.errorDisplay(
@@ -413,16 +419,20 @@ class EndoscopyComputePath:
 
         # Make a curve from these resampledPoints
         self.resampledCurve = slicer.vtkMRMLMarkupsCurveNode()
-        coord = np.zeros((3,))
+        points = np.zeros((self.n, 3))
+        wasModified = self.resampledCurve.StartModify()
         for i in range(self.n):
-            resampledPoints.GetPoint(i, coord)
-            self.resampledCurve.AddControlPointWorld(*coord)
+            resampledPoints.GetPoint(i, points[i])
+            self.resampledCurve.AddControlPointWorld(*points[i])
+        self.resampledCurve.EndModify(wasModified)
 
         # TODO: What else for self.resampledCurve should be set?
 
+        self.planePosition, self.planeNormal = EndoscopyLogic.planeFit(points.T)
+
         return True
 
-    def SetCameraOrientationsFromInputCurve():
+    def SetCameraOrientationsFromInputCurve(self):
         # Interpolate the camera orientations for our resampledPoints
 
         # Find the camera orientations in the input curve
@@ -440,18 +450,21 @@ class EndoscopyComputePath:
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
                     self.GetRelativeOrientation(i, orientation)
-                quaternion = EndoscopyComputePath.OrientationToQuaternion(orientation)
-                quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, *quaternion)
+                quaternion = EndoscopyLogic.OrientationToQuaternion(orientation)
+                quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, quaternion)
 
         # Find the places at which we wish to have orientations
+        wasModified = self.resampledCurve.StartModify()
         for i in range(self.n):
             distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, i)
             quaternion = np.zeros((4,))
             quaternionInterpolator.InterpolateQuaternion(distanceAlongResampledCurve, quaternion)
-            orientation = EndoscopyComputePath.QuaternionToOrientation(quaternion)
+            orientation = EndoscopyLogic.QuaternionToOrientation(quaternion)
             self.resampledCurve.SetNthControlPointOrientation(i, *orientation)
+        self.resampledCurve.EndModify(wasModified)
+        return True
 
-    def GetDefaultOrientation(self, i, orientation=None):
+    def GetDefaultOrientation(self, i, orientation=np.zeros((4,))):
         cameraPosition = np.zeros((3,))
         self.resampledCurve.GetNthControlPointPositionWorld(i, cameraPosition)
         focalPointPosition = np.zeros((3,))
@@ -459,12 +472,12 @@ class EndoscopyComputePath:
         matrix3x3 = np.zeros((3, 3))
         matrix3x3[:, 2] = focalPointPosition - cameraPosition
         matrix3x3[:, 2] /= np.linalg.norm(matrix3x3[:, 2])
-        matrix3x3[:, 0] = np.cross(self.pathPlaneNormal, matrix3x3[:, 2])
+        matrix3x3[:, 0] = np.cross(self.planeNormal, matrix3x3[:, 2])
         matrix3x3[:, 0] /= np.linalg.norm(matrix3x3[:, 0])
         matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
-        return EndoscopyComputePath.Matrix3x3ToOrientation(matrix3x3, orientation)
+        return EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
 
-    def GetRelativeOrientation(self, i, resultOrientation=None):
+    def GetRelativeOrientation(self, i, resultOrientation=np.zeros((4,))):
         rightOrientation = self.GetDefaultOrientation(i)
         # Compute the inverse of rightOrientation by negating its angle of rotation.
         rightOrientation[0] *= -1.0
@@ -472,18 +485,17 @@ class EndoscopyComputePath:
         leftOrientation = np.zeros((4,))
         self.inputCurve.GetNthControlPointOrientation(i, leftOrientation)
 
-        return EndoscopyComputePath.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
+        return EndoscopyLogic.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
 
     def IndicateFailure(self):
-        # We cannot fly through if there is no self.resampledCurve.
-        if hasattr(self, "resampledCurve"):
-            del self.resampledCurve
+        # We need to stop the user from doing a fly through.  We will delete the required self.resampledCurve.
+        self.resampledCurve = None
 
     @staticmethod
     def Matrix3x3ToOrientation(matrix3x3, orientation=np.zeros((4,))):
         vtkQ = vtk.vtkQuaternion[np.float64]()
-        vtkQ.FromMatrix(matrix3x3)
-        vtkQ.GetRotationAngleAndAxis(orientation)
+        vtkQ.FromMatrix3x3(matrix3x3)
+        orientation[0] = vtkQ.GetRotationAngleAndAxis(orientation[1:4])
         return orientation
 
     @staticmethod
@@ -495,7 +507,7 @@ class EndoscopyComputePath:
     def OrientationToMatrix3x3(orientation, matrix3x3=np.zeros((3, 3))):
         vtkQ = vtk.vtkQuaternion[np.float64]()
         vtkQ.SetRotationAngleAndAxis(*orientation)
-        vtkQ.ToMatrix(matrix3x3)
+        vtkQ.ToMatrix3x3(matrix3x3)
         return matrix3x3
 
     @staticmethod
@@ -514,18 +526,39 @@ class EndoscopyComputePath:
     def QuaternionToOrientation(quaternion, orientation=np.zeros((4,))):
         vtkQ = vtk.vtkQuaternion[np.float64]()
         vtkQ.Set(*quaternion)
-        vtkQ.GetRotationAngleAndAxis(orientation)
+        orientation[0] = vtkQ.GetRotationAngleAndAxis(orientation[1:4])
         return orientation
 
     @staticmethod
-    def MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation=None):
-        return EndoscopyComputePath.Matrix3x3ToOrientation(
+    def MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation=np.zeros((4,))):
+        return EndoscopyLogic.Matrix3x3ToOrientation(
             np.matmul(
-                EndoscopyComputePath.OrientationToMatrix3x3(leftOrientation),
-                EndoscopyComputePath.OrientationToMatrix3x3(rightOrientation),
+                EndoscopyLogic.OrientationToMatrix3x3(leftOrientation),
+                EndoscopyLogic.OrientationToMatrix3x3(rightOrientation),
             ),
             resultOrientation,
         )
+
+    @staticmethod
+    def planeFit(points):
+        """
+        source: https://stackoverflow.com/questions/12299540/plane-fitting-to-4-or-more-xyz-points
+
+        p, n = planeFit(points)
+
+        Given an array, points, of shape (d,...)
+        representing points in d-dimensional space,
+        fit an d-dimensional plane to the points.
+        Return a point, p, on the plane (the point-cloud centroid),
+        and the normal, n.
+        """
+
+        points = np.reshape(points, (np.shape(points)[0], -1))  # Collapse trialing dimensions
+        assert points.shape[0] <= points.shape[1], f"There are only {points.shape[1]} points in {points.shape[0]} dimensions."
+        ctr = points.mean(axis=1)
+        x = points - ctr[:, np.newaxis]
+        M = np.dot(x, x.T)  # Could also use np.cov(x) here.
+        return ctr, np.linalg.svd(M)[0][:, -1]
 
 
 class EndoscopyPathModel:
@@ -534,9 +567,9 @@ class EndoscopyPathModel:
          - Add a single polyline
     """
 
-    def __init__(self, path, fiducialListNode, outputPathNode=None, cursorType=None):
+    def __init__(self, resampledCurve, fiducialListNode, outputPathNode=None, cursorType=None):
         """
-          :param path: path points as numpy array.
+          :param resampledCurve: resampledCurve generated by EndoscopyLogic
           :param fiducialListNode: input node, just used for naming the output node.
           :param outputPathNode: output model node that stores the path points.
           :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to change the size,
@@ -565,14 +598,15 @@ class EndoscopyPathModel:
         idArray.Reset()
         idArray.InsertNextTuple1(0)
 
-        for point in path:
+        for i in range(resampledCurve.GetNumberOfControlPoints()):
+            point = np.zeros((3,))
+            resampledCurve.GetNthControlPointPositionWorld(i, point)
             pointIndex = points.InsertNextPoint(*point)
             linesIDArray.InsertNextTuple1(pointIndex)
             linesIDArray.SetTuple1(0, linesIDArray.GetNumberOfTuples() - 1)
             lines.SetNumberOfCells(1)
 
         pointsArray = vtk.util.numpy_support.vtk_to_numpy(points.GetData())
-        self.planePosition, self.planeNormal = self.planeFit(pointsArray.T)
 
         # Create model node
         model = outputPathNode
@@ -616,23 +650,3 @@ class EndoscopyPathModel:
         cursor.SetAndObserveTransformNodeID(transform.GetID())
 
         self.transform = transform
-
-    # source: https://stackoverflow.com/questions/12299540/plane-fitting-to-4-or-more-xyz-points
-    def planeFit(self, points):
-        """
-        p, n = planeFit(points)
-
-        Given an array, points, of shape (d,...)
-        representing points in d-dimensional space,
-        fit an d-dimensional plane to the points.
-        Return a point, p, on the plane (the point-cloud centroid),
-        and the normal, n.
-        """
-
-        from np.linalg import svd
-        points = np.reshape(points, (np.shape(points)[0], -1))  # Collapse trialing dimensions
-        assert points.shape[0] <= points.shape[1], f"There are only {points.shape[1]} points in {points.shape[0]} dimensions."
-        ctr = points.mean(axis=1)
-        x = points - ctr[:, np.newaxis]
-        M = np.dot(x, x.T)  # Could also use np.cov(x) here.
-        return ctr, svd(M)[0][:, -1]
