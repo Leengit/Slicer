@@ -1,4 +1,5 @@
 import ctk
+import math
 import numpy as np
 import qt
 import slicer
@@ -38,6 +39,9 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
     """Uses slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
+
+    # TODO: Need to use logic of https://github.com/Slicer/Slicer/pull/6541/files, Lines 465 and following to handle
+    # user's use of the new GUI.
 
     def __init__(self, parent=None):
         slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget.__init__(self, parent)
@@ -304,7 +308,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
     def onFiducialNodeModified(self, observer, eventid):
         """If the fiducial was changed we need to repopulate the keyframe UI"""
         # Hack rebuild path just to get the new data
-        if self.fiducialNode != None:
+        if self.fiducialNode is not None:
             self.logic = EndoscopyLogic(self.fiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to self.logic.n - 1
             self.keyframeSlider.maximum = self.logic.n - 1
@@ -388,7 +392,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         focalPointPosition = np.zeros((3,))
         self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
 
-        defaultOrientation = self.logic.getDefaultOrientation(pathPointIndex)
+        defaultOrientation = self.logic.getDefaultOrientation(self.resampledCurve, pathPointIndex)
         relativeOrientation = np.zeros((4,))
         self.resampledCurve.GetNthControlPointOrientation(pathPointIndex, relativeOrientation)
         resultMatrix = np.matmul(
@@ -419,9 +423,6 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
 
 class EndoscopyLogic:
-    # TODO: Need to use logic of https://github.com/Slicer/Slicer/pull/6541/files, Lines 465 and following to handle
-    # user's use of the new GUI.
-
     """Compute path given a list of fiducial nodes.
     Path is stored in 'path' member variable as a numpy array.
     If a point list is received then curve points are generated using Hermite spline interpolation.
@@ -432,7 +433,7 @@ class EndoscopyLogic:
       print("computer path has %d elements" % self.logic.resampledCurve.GetNumberOfControlPoints())
 
     Note:
-    * `orientation` = (angle, *axis), where angle is in degrees and axis is the unit 3D-vector for the axis of rotation.
+    * `orientation` = (angle, *axis), where angle is in radians and axis is the unit 3D-vector for the axis of rotation.
     * `quaternion` = (cos(angle/2), *axis * sin(angle/2))
     * `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
     """
@@ -488,6 +489,10 @@ class EndoscopyLogic:
             slicer.util.errorDisplay("You need at least 2 control points in order to make a fly through.", "Run Error")
             return False
 
+        # Copy everything from the input
+        self.inputCurve.Copy(fiducialListNode)
+
+        """
         # Copy the control points
         coord = np.zeros((3,))
         wasModified = self.inputCurve.StartModify()
@@ -518,6 +523,7 @@ class EndoscopyLogic:
             for i in range(n):
                 self.inputCurve.SetNthControlPointOrientation(i, *orientation)
             self.inputCurve.EndModify(wasModified)
+        """
         return True
 
     def setCameraPositionsFromInputCurve(self):
@@ -537,14 +543,14 @@ class EndoscopyLogic:
 
         # Make a curve from these resampledPoints
         self.resampledCurve = slicer.vtkMRMLMarkupsCurveNode()
-        points = np.zeros((self.n, 3))
         wasModified = self.resampledCurve.StartModify()
+        self.resampledCurve.Copy(self.inputCurve)
+        self.resampledCurve.RemoveAllControlPoints()
+        points = np.zeros((self.n, 3))
         for i in range(self.n):
             resampledPoints.GetPoint(i, points[i])
             self.resampledCurve.AddControlPointWorld(*points[i])
         self.resampledCurve.EndModify(wasModified)
-
-        # TODO: What else for self.resampledCurve should be set?
 
         self.planePosition, self.planeNormal = EndoscopyLogic.PlaneFit(points.T)
 
@@ -558,23 +564,45 @@ class EndoscopyLogic:
         quaternionInterpolator = vtk.vtkQuaternionInterpolator()
         quaternionInterpolator.SetSearchMethod(0)  # binary search
         quaternionInterpolator.SetInterpolationTypeToSpline()  # cubic rather than linear interpolation
+        # If the curve is closed, put the first orientation also at the end
+        lastN = n if self.inputCurve.GetClassName() == "vtkMRMLMarkupsClosedCurveNode" else n - 1
+        distanceAlongInputCurve = 0.0
+        previousPoint = self.inputCurve.GetNthControlPointPositionWorld(0)
         for i in range(n):
+            nextPoint = self.inputCurve.GetNthControlPointPositionWorld(i)
+            distanceAlongInputCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
+            previousPoint = nextPoint
             # TODO: For the moment assume that all orientations have been supplied by the user.  This loop should
             # instead include only user-supplied interpolations.  Those that are not supplied by the user, and thus are
             # in need of being computed via interpolation, should not be supplied via .AddQuaternion().
             supplied = True
-            if supplied or i == 0 or i == n - 1:
-                distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, i)
+            if supplied or i == 0 or i == lastN:
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
-                    self.getRelativeOrientation(i, orientation)
+                    self.getRelativeOrientation(self.inputCurve, i, orientation)
                 quaternion = EndoscopyLogic.OrientationToQuaternion(orientation)
+                if i == 0:
+                    saveQuaternion = quaternion
                 quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, quaternion)
+        if lastN == n:
+            # For a closed curve, we put the first orientation at the end too
+            nextPoint = self.inputCurve.GetNthControlPointPositionWorld(0)
+            distanceAlongInputCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
+            previousPoint = nextPoint
+            quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, saveQuaternion)
 
         # Find the places at which we wish to have orientations
         wasModified = self.resampledCurve.StartModify()
+        distanceAlongResampledCurve = 0.0
+        previousPoint = self.resampledCurve.GetNthControlPointPositionWorld(0)
+        print(f"Perform {self.n} quaternion interpolations")
         for i in range(self.n):
-            distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, i)
+            nextPoint = self.resampledCurve.GetNthControlPointPositionWorld(i)
+            distanceAlongResampledCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
+            previousPoint = nextPoint
+            # TODO: When measured along self.resampledCurve, lengths between control points of self.inputCurve may be
+            # different, which will cause the transfer of orientations between these curves to be out of synch.  Figure
+            # out what to do about that, perhaps using one of the vtkMRMLMarkupsCurveNode::*Closest* methods.
             quaternion = np.zeros((4,))
             quaternionInterpolator.InterpolateQuaternion(distanceAlongResampledCurve, quaternion)
             orientation = EndoscopyLogic.QuaternionToOrientation(quaternion)
@@ -582,26 +610,32 @@ class EndoscopyLogic:
         self.resampledCurve.EndModify(wasModified)
         return True
 
-    def getDefaultOrientation(self, i, orientation=np.zeros((4,))):
+    def getDefaultOrientation(self, curve, pathIndex, orientation=np.zeros((4,))):
+        n = curve.GetNumberOfControlPoints()
+        # If the curve is not closed then the last control point has the same orientation as its previous control point
+        if pathIndex == n - 1 and curve.GetClassName() != "vtkMRMLMarkupsClosedCurveNode":
+            pathIndex -= 1
+        nextPathIndex = (pathIndex + 1) % n
         cameraPosition = np.zeros((3,))
-        self.resampledCurve.GetNthControlPointPositionWorld(i, cameraPosition)
+        curve.GetNthControlPointPositionWorld(pathIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
-        self.resampledCurve.GetNthControlPointPositionWorld(i + 1, focalPointPosition)
+        curve.GetNthControlPointPositionWorld(nextPathIndex, focalPointPosition)
         matrix3x3 = np.zeros((3, 3))
         matrix3x3[:, 2] = focalPointPosition - cameraPosition
         matrix3x3[:, 2] /= np.linalg.norm(matrix3x3[:, 2])
         matrix3x3[:, 0] = np.cross(self.planeNormal, matrix3x3[:, 2])
         matrix3x3[:, 0] /= np.linalg.norm(matrix3x3[:, 0])
         matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
-        return EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
+        EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
+        return orientation
 
-    def getRelativeOrientation(self, i, resultOrientation=np.zeros((4,))):
-        rightOrientation = self.getDefaultOrientation(i)
+    def getRelativeOrientation(self, curve, i, resultOrientation=np.zeros((4,))):
+        rightOrientation = self.getDefaultOrientation(curve, i)
         # Compute the inverse of rightOrientation by negating its angle of rotation.
         rightOrientation[0] *= -1.0
 
         leftOrientation = np.zeros((4,))
-        self.inputCurve.GetNthControlPointOrientation(i, leftOrientation)
+        curve.GetNthControlPointOrientation(i, leftOrientation)
 
         return EndoscopyLogic.MultiplyOrientations(leftOrientation, rightOrientation, resultOrientation)
 
@@ -710,9 +744,9 @@ class EndoscopyPathModel:
         idArray.Reset()
         idArray.InsertNextTuple1(0)
 
-        for i in range(resampledCurve.GetNumberOfControlPoints()):
+        for pathIndex in range(resampledCurve.GetNumberOfControlPoints()):
             point = np.zeros((3,))
-            resampledCurve.GetNthControlPointPositionWorld(i, point)
+            resampledCurve.GetNthControlPointPositionWorld(pathIndex, point)
             pointIndex = points.InsertNextPoint(*point)
             linesIDArray.InsertNextTuple1(pointIndex)
             linesIDArray.SetTuple1(0, linesIDArray.GetNumberOfTuples() - 1)
