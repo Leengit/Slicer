@@ -1,5 +1,4 @@
 import ctk
-import math
 import numpy as np
 import qt
 import slicer
@@ -491,39 +490,6 @@ class EndoscopyLogic:
 
         # Copy everything from the input
         self.inputCurve.Copy(fiducialListNode)
-
-        """
-        # Copy the control points
-        coord = np.zeros((3,))
-        wasModified = self.inputCurve.StartModify()
-        for i in range(n):
-            fiducialListNode.GetNthControlPointPositionWorld(i, coord)
-            self.inputCurve.AddControlPointWorld(*coord)
-        self.inputCurve.EndModify(wasModified)
-
-        # Copy the orientation information to the new curve.
-        if (
-            fiducialListNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
-            or fiducialListNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode"
-        ):
-            # TODO: How do we distinguish a user-supplied identity matrix from a user's request that the orientation
-            # for this position be computed via interpolation?  For the moment we assume that the user has supplied
-            # an orientation for every control point.
-            orientation = np.zeros((4,))
-            wasModified = self.inputCurve.StartModify()
-            for i in range(n):
-                fiducialListNode.GetNthControlPointOrientation(i, orientation)
-                self.inputCurve.SetNthControlPointOrientation(i, *orientation)
-            self.inputCurve.EndModify(wasModified)
-        else:
-            # TODO: No orientation information is available.  For the moment assume that the user effectively
-            # supplied the identity matrix for each control point.
-            orientation = np.array([0.0, 0.0, 0.0, 1.0])
-            wasModified = self.inputCurve.StartModify()
-            for i in range(n):
-                self.inputCurve.SetNthControlPointOrientation(i, *orientation)
-            self.inputCurve.EndModify(wasModified)
-        """
         return True
 
     def setCameraPositionsFromInputCurve(self):
@@ -566,17 +532,17 @@ class EndoscopyLogic:
         quaternionInterpolator.SetInterpolationTypeToSpline()  # cubic rather than linear interpolation
         # If the curve is closed, put the first orientation also at the end
         lastN = n if self.inputCurve.GetClassName() == "vtkMRMLMarkupsClosedCurveNode" else n - 1
-        distanceAlongInputCurve = 0.0
-        previousPoint = self.inputCurve.GetNthControlPointPositionWorld(0)
         for i in range(n):
-            nextPoint = self.inputCurve.GetNthControlPointPositionWorld(i)
-            distanceAlongInputCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
-            previousPoint = nextPoint
             # TODO: For the moment assume that all orientations have been supplied by the user.  This loop should
             # instead include only user-supplied interpolations.  Those that are not supplied by the user, and thus are
             # in need of being computed via interpolation, should not be supplied via .AddQuaternion().
             supplied = True
             if supplied or i == 0 or i == lastN:
+                controlPoint = self.inputCurve.GetNthControlPointPositionWorld(i)
+                indexOfCurvePoint = self.inputCurve.GetClosestCurvePointIndexToPositionWorld(controlPoint)
+                print(f"indexOfCurvePoint[{i}] = {indexOfCurvePoint}")
+                distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, indexOfCurvePoint)
+                print(f"distanceAlongInputCurve[{i}] = {distanceAlongInputCurve}")
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
                     self.getRelativeOrientation(self.inputCurve, i, orientation)
@@ -586,27 +552,24 @@ class EndoscopyLogic:
                 quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, quaternion)
         if lastN == n:
             # For a closed curve, we put the first orientation at the end too
-            nextPoint = self.inputCurve.GetNthControlPointPositionWorld(0)
-            distanceAlongInputCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
-            previousPoint = nextPoint
+            distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, -1)
             quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, saveQuaternion)
+        print(f"Final {distanceAlongInputCurve = }")
 
         # Find the places at which we wish to have orientations
+        fudgeFactor = self.inputCurve.GetCurveLengthWorld(0, -1) / self.resampledCurve.GetCurveLengthWorld(0, -1)
         wasModified = self.resampledCurve.StartModify()
-        distanceAlongResampledCurve = 0.0
-        previousPoint = self.resampledCurve.GetNthControlPointPositionWorld(0)
         print(f"Perform {self.n} quaternion interpolations")
         for i in range(self.n):
-            nextPoint = self.resampledCurve.GetNthControlPointPositionWorld(i)
-            distanceAlongResampledCurve += math.sqrt(vtk.vtkMath.Distance2BetweenPoints(previousPoint, nextPoint))
-            previousPoint = nextPoint
-            # TODO: When measured along self.resampledCurve, lengths between control points of self.inputCurve may be
-            # different, which will cause the transfer of orientations between these curves to be out of synch.  Figure
-            # out what to do about that, perhaps using one of the vtkMRMLMarkupsCurveNode::*Closest* methods.
+            controlPoint = self.resampledCurve.GetNthControlPointPositionWorld(i)
+            indexOfCurvePoint = self.resampledCurve.GetClosestCurvePointIndexToPositionWorld(controlPoint)
+            print(f"indexOfCurvePoint[{i}] = {indexOfCurvePoint}")
+            distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, indexOfCurvePoint) * fudgeFactor
             quaternion = np.zeros((4,))
             quaternionInterpolator.InterpolateQuaternion(distanceAlongResampledCurve, quaternion)
             orientation = EndoscopyLogic.QuaternionToOrientation(quaternion)
             self.resampledCurve.SetNthControlPointOrientation(i, *orientation)
+        print(f"Final {distanceAlongResampledCurve = }")
         self.resampledCurve.EndModify(wasModified)
         return True
 
