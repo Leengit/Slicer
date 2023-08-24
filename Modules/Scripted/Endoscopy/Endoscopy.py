@@ -44,19 +44,22 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def __init__(self, parent=None):
         slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget.__init__(self, parent)
-        self.cameraNode = None
-        self.cameraNodeObserverTag = None
-        self.cameraObserverTag = None
-        # Flythough variables
         self.transform = None
+        self.inputCurve = None
         self.resampledCurve = None
-        self.camera = None
         self.skip = 0
         self.timer = qt.QTimer()
         self.timer.setInterval(20)
         self.timer.connect('timeout()', self.flyToNext)
-        self.fiducialNode = None  # TODO: Do we need this?
-        self.fiducialNodeObserverTag = None  # TODO: Do we need this?
+
+        self.cameraNodeObserverTags = None
+        self.cameraNode = None
+        self.cameraObserverTags = None
+        self.camera = None
+        self.cursorNodeObserverTags = None
+        self.cursorNode = None
+        self.fiducialNodeObserverTags = None
+        self.fiducialNode = None
 
     def setup(self):
         slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget.setup(self)
@@ -227,27 +230,47 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if self.logic:
             self.logic.cleanup()
         self.logic = None
+        for tags, node in [
+            (self.cameraNodeObserverTags, self.cameraNode),
+            (self.cameraObserverTags, self.camera),
+            (self.cursorNodeObserverTags, self.cursorNode),
+            (self.fiducialNodeObserverTags, self.fiducialNode),
+        ]:
+            if tags and node:
+                for tag in tags:
+                    node.RemoveObserver(tag)
+        self.cameraNodeObserverTags = None
+        self.cameraNode = None
+        self.cameraObserverTags = None
+        self.camera = None
+        self.cursorNodeObserverTags = None
+        self.cursorNode = None
+        self.fiducialNodeObserverTags = None
+        self.fiducialNode = None
+
         slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget.cleanup(self)
 
     def setCameraNode(self, newCameraNode):
         """Allow to set the current camera node.
         Connected to signal 'currentNodeChanged()' emitted by camera node selector."""
 
-        #  Remove previous observer
-        if self.cameraNode and self.cameraNodeObserverTag:
-            self.cameraNode.RemoveObserver(self.cameraNodeObserverTag)
-        if self.camera and self.cameraObserverTag:
-            self.camera.RemoveObserver(self.cameraObserverTag)
+        #  Remove previous observers
+        if self.cameraNode and self.cameraNodeObserverTags:
+            for tag in self.cameraNodeObserverTags:
+                self.cameraNode.RemoveObserver(tags)
+        if self.camera and self.cameraObserverTags:
+            for tag in self.cameraObserverTags:
+                self.camera.RemoveObserver(tag)
 
         newCamera = None
         if newCameraNode:
             newCamera = newCameraNode.GetCamera()
             # Add CameraNode ModifiedEvent observer
-            self.cameraNodeObserverTag = newCameraNode.AddObserver(
-                vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified
-            )
+            self.cameraNodeObserverTags = [
+                newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
+            ]
             # Add Camera ModifiedEvent observer
-            self.cameraObserverTag = newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
+            self.cameraObserverTags = [newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]
 
         self.cameraNode = newCameraNode
         self.camera = newCamera
@@ -259,14 +282,15 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         """Allow to set the current list of input nodes.
         Connected to signal 'currentNodeChanged()' emitted by fiducial node selector."""
         #  Remove previous observer
-        if self.fiducialNode and self.fiducialNodeObserverTag:
-            self.fiducialNode.RemoveObserver(self.fiducialNodeObserverTag)
+        if self.fiducialNode and self.fiducialNodeObserverTags:
+            for tag in self.fiducialNodeObserverTags:
+                self.fiducialNode.RemoveObserver(tag)
 
         if newFiducialNode:
             # Add CameraNode ModifiedEvent observer
-            self.fiducialNodeObserverTag = newFiducialNode.AddObserver(
-                vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified
-            )
+            self.fiducialNodeObserverTags = [
+                newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)
+            ]
             self.keyframeCollapsibleButton.enabled = True
             self.logic = EndoscopyLogic(newFiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to n - 1
@@ -299,15 +323,15 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         """Connected to both the fiducial and camera node selector. It allows to
         enable or disable the 'create path' button."""
         self.createPathButton.enabled = (
-            self.cameraNodeSelector.currentNode() is not None
-            and self.inputFiducialNodeSelector.currentNode() is not None
-            and self.outputPathNodeSelector.currentNode() is not None
+            self.cameraNodeSelector.currentNode()
+            and self.inputFiducialNodeSelector.currentNode()
+            and self.outputPathNodeSelector.currentNode()
         )
 
     def onFiducialNodeModified(self, observer, eventid):
         """If the fiducial was changed we need to repopulate the keyframe UI"""
         # Hack rebuild path just to get the new data
-        if self.fiducialNode is not None:
+        if self.fiducialNode:
             self.logic = EndoscopyLogic(self.fiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to self.logic.n - 1
             self.keyframeSlider.maximum = self.logic.n - 1
@@ -428,7 +452,7 @@ class EndoscopyLogic:
     See https://en.wikipedia.org/wiki/Cubic_Hermite_spline
 
     Example:
-      self.logic = EndoscopyLogic(fiducialListNode)
+      self.logic = EndoscopyLogic(inputMarkupsFiducialNode)
       print("computer path has %d elements" % self.logic.resampledCurve.GetNumberOfControlPoints())
 
     Note:
@@ -437,11 +461,11 @@ class EndoscopyLogic:
     * `matrix` = matrix with columns x, y, and z, which are unit vectors for the rotated frame
     """
 
-    def __init__(self, fiducialListNode, dl=0.5):
+    def __init__(self, inputMarkupsFiducialNode, dl=0.5):
         self.dl = dl  # desired world space step size (in mm)
 
         if not (
-            self.setCurveFromInput(fiducialListNode)
+            self.setCurveFromFiducialInput(inputMarkupsFiducialNode)
             and self.setCameraPositionsFromInputCurve()
             and self.setCameraOrientationsFromInputCurve()
         ):
@@ -454,42 +478,37 @@ class EndoscopyLogic:
     def cleanup(self):
         if False:
             # TODO: These fields don't exist (yet).  They seem like they should be EndoscopyWidget members.  Is this right?
-            for tag in self.curveNodeObserverTags:
-                self.curveNode.RemoveObserver(tag)
-            for tag in self.cursorNodeObserverTags:
-                self.cursorNode.RemoveObserver(tag)
             if self.cursorNode:
                 slicer.mrmlScene.RemoveNode(self.cursorNode)
             self.cursorNode = None
 
-    def setCurveFromInput(self, fiducialListNode):
+    def setCurveFromFiducialInput(self, inputMarkupsFiducialNode):
         # Make a deep copy of the input information as a vtkMRMLMarkupsCurveNode.
-        self.inputCurve = None
         if (
-            fiducialListNode.GetClassName() == "vtkMRMLMarkupsFiducialNode"
-            or fiducialListNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
+            inputMarkupsFiducialNode.GetClassName() == "vtkMRMLMarkupsFiducialNode"
+            or inputMarkupsFiducialNode.GetClassName() == "vtkMRMLMarkupsCurveNode"
         ):
             self.inputCurve = slicer.vtkMRMLMarkupsCurveNode()
-        elif fiducialListNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode":
+        elif inputMarkupsFiducialNode.GetClassName() == "vtkMRMLMarkupsClosedCurveNode":
             self.inputCurve = slicer.vtkMRMLMarkupsClosedCurveNode()
         else:
-            # Unrecognized type for fiducialListNode
+            # Unrecognized type for inputMarkupsFiducialNode
             slicer.util.errorDisplay(
-                "The fiducialListNode must be a vtkMRMLMarkupsFiducialNode, vtkMRMLMarkupsCurveNode, or"
-                + " vtkMRMLMarkupsClosedCurveNode.  {fiducialListNode.GetClassName()} cannot be processed.",
+                "The inputMarkupsFiducialNode must be a vtkMRMLMarkupsFiducialNode, vtkMRMLMarkupsCurveNode, or"
+                + " vtkMRMLMarkupsClosedCurveNode.  {inputMarkupsFiducialNode.GetClassName()} cannot be processed.",
                 "Run Error",
             )
             return False
 
         # We have an input.  Check that it is big enough.
-        n = fiducialListNode.GetNumberOfControlPoints()
+        n = inputMarkupsFiducialNode.GetNumberOfControlPoints()
         if n < 2:
             # Need at least two points to make segments.
             slicer.util.errorDisplay("You need at least 2 control points in order to make a fly through.", "Run Error")
             return False
 
         # Copy everything from the input
-        self.inputCurve.Copy(fiducialListNode)
+        self.inputCurve.Copy(inputMarkupsFiducialNode)
         return True
 
     def setCameraPositionsFromInputCurve(self):
@@ -500,9 +519,9 @@ class EndoscopyLogic:
         )
         self.n = resampledPoints.GetNumberOfPoints()
         if self.n < 2:
+            curveLength = self.inputCurve.GetCurveLengthWorld()
             slicer.util.errorDisplay(
-                "The curve is of length {self.inputCurve.GetCurveLengthWorld()}"
-                + " and is too short to support a step size of {self.dl}.",
+                "The curve length {curveLength} is too short to support a step size of {self.dl}.",
                 "Run Error",
             )
             return False
@@ -538,11 +557,9 @@ class EndoscopyLogic:
             # in need of being computed via interpolation, should not be supplied via .AddQuaternion().
             supplied = True
             if supplied or i == 0 or i == lastN:
-                controlPoint = self.inputCurve.GetNthControlPointPositionWorld(i)
-                indexOfCurvePoint = self.inputCurve.GetClosestCurvePointIndexToPositionWorld(controlPoint)
-                print(f"indexOfCurvePoint[{i}] = {indexOfCurvePoint}")
-                distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, indexOfCurvePoint)
-                print(f"distanceAlongInputCurve[{i}] = {distanceAlongInputCurve}")
+                distanceAlongInputCurve = EndoscopyLogic.distanceAlongCurveOfNthControlPointPositionWorld(
+                    self.inputCurve, i
+                )
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
                     self.getRelativeOrientation(self.inputCurve, i, orientation)
@@ -552,24 +569,22 @@ class EndoscopyLogic:
                 quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, quaternion)
         if lastN == n:
             # For a closed curve, we put the first orientation at the end too
-            distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld(0, -1)
+            distanceAlongInputCurve = self.inputCurve.GetCurveLengthWorld()
             quaternionInterpolator.AddQuaternion(distanceAlongInputCurve, saveQuaternion)
-        print(f"Final {distanceAlongInputCurve = }")
 
         # Find the places at which we wish to have orientations
-        fudgeFactor = self.inputCurve.GetCurveLengthWorld(0, -1) / self.resampledCurve.GetCurveLengthWorld(0, -1)
         wasModified = self.resampledCurve.StartModify()
-        print(f"Perform {self.n} quaternion interpolations")
+        # The curves have different resolutions so their lengths won't come out exactly the same.  We scale the
+        # distances along self.resampledCurve with a fudgeFactor so that the lengths do come out the same.
+        fudgeFactor = self.inputCurve.GetCurveLengthWorld() / self.resampledCurve.GetCurveLengthWorld()
         for i in range(self.n):
-            controlPoint = self.resampledCurve.GetNthControlPointPositionWorld(i)
-            indexOfCurvePoint = self.resampledCurve.GetClosestCurvePointIndexToPositionWorld(controlPoint)
-            print(f"indexOfCurvePoint[{i}] = {indexOfCurvePoint}")
-            distanceAlongResampledCurve = self.resampledCurve.GetCurveLengthWorld(0, indexOfCurvePoint) * fudgeFactor
+            distanceAlongInputCurve = (
+                EndoscopyLogic.distanceAlongCurveOfNthControlPointPositionWorld(self.resampledCurve, i) * fudgeFactor
+            )
             quaternion = np.zeros((4,))
-            quaternionInterpolator.InterpolateQuaternion(distanceAlongResampledCurve, quaternion)
+            quaternionInterpolator.InterpolateQuaternion(distanceAlongInputCurve, quaternion)
             orientation = EndoscopyLogic.QuaternionToOrientation(quaternion)
             self.resampledCurve.SetNthControlPointOrientation(i, *orientation)
-        print(f"Final {distanceAlongResampledCurve = }")
         self.resampledCurve.EndModify(wasModified)
         return True
 
@@ -605,6 +620,14 @@ class EndoscopyLogic:
     def indicateFailure(self):
         # We need to stop the user from doing a fly through.  We will delete the required self.resampledCurve.
         self.resampledCurve = None
+
+    @staticmethod
+    def distanceAlongCurveOfNthControlPointPositionWorld(curve, indexOfControlPoint):
+        controlPoint = curve.GetNthControlPointPositionWorld(indexOfControlPoint)
+        # Curve points are about 10-to-1 control points.  There are index+1 points in {0, ..., index}.
+        numberOfCurvePoints = curve.GetClosestCurvePointIndexToPositionWorld(controlPoint) + 1
+        distance = curve.GetCurveLengthWorld(0, numberOfCurvePoints)
+        return distance
 
     @staticmethod
     def Matrix3x3ToOrientation(matrix3x3, orientation=np.zeros((4,))):
@@ -679,10 +702,10 @@ class EndoscopyPathModel:
          - Add a single polyline
     """
 
-    def __init__(self, resampledCurve, fiducialListNode, outputPathNode=None, cursorType=None):
+    def __init__(self, resampledCurve, inputMarkupsFiducialNode, outputPathNode=None, cursorType=None):
         """
           :param resampledCurve: resampledCurve generated by EndoscopyLogic
-          :param fiducialListNode: input node, just used for naming the output node.
+          :param inputMarkupsFiducialNode: input node, just used for naming the output node.
           :param outputPathNode: output model node that stores the path points.
           :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to change the size,
             can jump to views by clicking on it, has more visualization options, can be scaled to fixed display size),
@@ -721,7 +744,7 @@ class EndoscopyPathModel:
         model = outputPathNode
         if not model:
             model = slicer.mrmlScene.AddNewNodeByClass(
-                "vtkMRMLModelNode", slicer.mrmlScene.GenerateUniqueName("Path-%s" % fiducialListNode.GetName())
+                "vtkMRMLModelNode", slicer.mrmlScene.GenerateUniqueName("Path-%s" % inputMarkupsFiducialNode.GetName())
             )
             model.CreateDefaultDisplayNodes()
             model.GetDisplayNode().SetColor(1, 1, 0)  # yellow
@@ -735,7 +758,7 @@ class EndoscopyPathModel:
                 # Markups cursor
                 cursor = slicer.mrmlScene.AddNewNodeByClass(
                     "vtkMRMLMarkupsFiducialNode",
-                    slicer.mrmlScene.GenerateUniqueName("Cursor-%s" % fiducialListNode.GetName()),
+                    slicer.mrmlScene.GenerateUniqueName("Cursor-%s" % inputMarkupsFiducialNode.GetName()),
                 )
                 cursor.CreateDefaultDisplayNodes()
                 cursor.GetDisplayNode().SetSelectedColor(1, 0, 0)  # red
@@ -746,7 +769,7 @@ class EndoscopyPathModel:
                 # Model cursor
                 cursor = slicer.mrmlScene.AddNewNodeByClass(
                     "vtkMRMLMarkupsModelNode",
-                    slicer.mrmlScene.GenerateUniqueName("Cursor-%s" % fiducialListNode.GetName()),
+                    slicer.mrmlScene.GenerateUniqueName("Cursor-%s" % inputMarkupsFiducialNode.GetName()),
                 )
                 cursor.CreateDefaultDisplayNodes()
                 cursor.GetDisplayNode().SetColor(1, 0, 0)  # red
@@ -763,7 +786,7 @@ class EndoscopyPathModel:
         if not transform:
             transform = slicer.mrmlScene.AddNewNodeByClass(
                 "vtkMRMLLinearTransformNode",
-                slicer.mrmlScene.GenerateUniqueName("Transform-%s" % fiducialListNode.GetName()),
+                slicer.mrmlScene.GenerateUniqueName("Transform-%s" % inputMarkupsFiducialNode.GetName()),
             )
             model.SetNodeReferenceID("CameraTransform", transform.GetID())
         cursor.SetAndObserveTransformNodeID(transform.GetID())
