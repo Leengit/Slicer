@@ -239,6 +239,12 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             if tags and node:
                 for tag in tags:
                     node.RemoveObserver(tag)
+
+        for node in [self.cursorNode, self.transform]:
+            # TODO: Is this right?
+            if node:
+                slicer.mrmlScene.RemoveNode(node)
+
         self.cameraNodeObserverTags = None
         self.cameraNode = None
         self.cameraObserverTags = None
@@ -293,6 +299,14 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             ]
             self.keyframeCollapsibleButton.enabled = True
             self.logic = EndoscopyLogic(newFiducialNode)
+            # TODO: Maybe.  Remove old observers from pre-existing self.curveNode.
+            # TODO: Maybe.  Copy newFiducialNode to self.curveNode.
+            # TODO: Maybe.  Then AddObserver???
+            # self.curveNodeObserverTags = [
+            #     self.curveNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
+            #     self.curveNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified)
+            # ]
+
             # keyframeSlider selects a control point (not a segment) so index goes up to n - 1
             self.keyframeSlider.maximum = newFiducialNode.GetNumberOfControlPoints() - 1
         else:
@@ -390,11 +404,27 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             self.timer.stop()
             self.playButton.text = "Play"
 
-    def selectControlPoint(self):
+    def selectControlPoints(self, mrmlNode):
         # TODO: Write me
         pass
 
     def refreshOrientations(self):
+        # TODO: Write me
+        pass
+
+    def selectControlPoint(self, index):
+        # TODO: Write me
+        pass
+
+    def controlPointsModified(self, observer, eventid):
+        # TODO: Write me
+        pass
+
+    def controlPointModified(self, observer, eventid):
+        # TODO: Write me
+        pass
+
+    def cursorModified(self, observer, eventid):
         # TODO: Write me
         pass
 
@@ -463,24 +493,21 @@ class EndoscopyLogic:
 
     def __init__(self, inputMarkupsFiducialNode, dl=0.5):
         self.dl = dl  # desired world space step size (in mm)
+        self.setControlPoints(inputMarkupsFiducialNode)
 
+    def __del__(self):
+        self.cleanup()
+
+    def cleanup(self):
+        pass
+
+    def setControlPoints(self, inputMarkupsFiducialNode):
         if not (
             self.setCurveFromFiducialInput(inputMarkupsFiducialNode)
             and self.setCameraPositionsFromInputCurve()
             and self.setCameraOrientationsFromInputCurve()
         ):
             self.indicateFailure()
-            return
-
-    def __del__(self):
-        self.cleanup()
-
-    def cleanup(self):
-        if False:
-            # TODO: These fields don't exist (yet).  They seem like they should be EndoscopyWidget members.  Is this right?
-            if self.cursorNode:
-                slicer.mrmlScene.RemoveNode(self.cursorNode)
-            self.cursorNode = None
 
     def setCurveFromFiducialInput(self, inputMarkupsFiducialNode):
         # Make a deep copy of the input information as a vtkMRMLMarkupsCurveNode.
