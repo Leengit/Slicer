@@ -48,6 +48,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.inputCurve = None
         self.resampledCurve = None
         self.skip = 0
+        self.logic = None
         self.timer = qt.QTimer()
         print('        self.timer = qt.QTimer()')
         self.timer.setInterval(20)
@@ -326,9 +327,11 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         display.SetRotationHandleVisibility(True)
         display.SetPropertiesLabelVisibility(False)
 
-        self.cursorNodeObserverTags = [self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)]
+        self.cursorNodeObserverTags.append(
+            self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)
+        )
         print(
-            'self.cursorNodeObserverTags = [self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)]'
+            'self.cursorNodeObserverTags.append(self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified))'
         )
         print('Where is cursorNode in the scene?')
 
@@ -370,24 +373,28 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if self.cameraNode:
             for tag in self.cameraNodeObserverTags:
                 self.cameraNode.RemoveObserver(tags)
+            self.cameraNodeObserverTags = []
         if self.camera:
             for tag in self.cameraObserverTags:
                 self.camera.RemoveObserver(tag)
+            self.cameraObserverTags = []
 
         newCamera = None
         if newCameraNode:
             newCamera = newCameraNode.GetCamera()
             # Add CameraNode ModifiedEvent observer
-            self.cameraNodeObserverTags = [
+            self.cameraNodeObserverTags.append(
                 newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
-            ]
+            )
             print(
-                'self.cameraNodeObserverTags = [newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]'
+                'self.cameraNodeObserverTags.append(newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified))'
             )
             # Add Camera ModifiedEvent observer
-            self.cameraObserverTags = [newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]
+            self.cameraObserverTags.append(
+                newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
+            )
             print(
-                'self.cameraObserverTags = [newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]'
+                'self.cameraObserverTags.append(newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified))'
             )
 
         self.cameraNode = newCameraNode
@@ -403,24 +410,27 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if self.fiducialNode:
             for tag in self.fiducialNodeObserverTags:
                 self.fiducialNode.RemoveObserver(tag)
+            self.fiducialNodeObserverTags = []
 
         if newFiducialNode:
             # Add CameraNode ModifiedEvent observer
-            self.fiducialNodeObserverTags = [
+            self.fiducialNodeObserverTags.append(
                 newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)
-            ]
-            print(
-                'self.fiducialNodeObserverTags = [newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)]'
             )
-            self.keyframeCollapsibleButton.enabled = True
+            print(
+                'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified))'
+            )
             self.logic = EndoscopyLogic(newFiducialNode)
+            self.keyframeCollapsibleButton.enabled = True
             # TODO: Maybe.  Remove old observers from pre-existing self.curveNode.
             # TODO: Maybe.  Copy newFiducialNode to self.curveNode.
             # TODO: Maybe.  Then AddObserver???
-            # self.curveNodeObserverTags = [
-            #     self.curveNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
-            #     self.curveNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified)
-            # ]
+            # self.curveNodeObserverTags.extend(
+            #     [
+            #         self.curveNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
+            #         self.curveNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified),
+            #     ]
+            # )
 
             # keyframeSlider selects a control point (not a segment) so index goes up to n - 1
             self.keyframeSlider.maximum = newFiducialNode.GetNumberOfControlPoints() - 1
@@ -467,8 +477,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def onCreatePathButtonClicked(self):
         """Connected to 'create path' button. It allows to:
-          - compute the path
-          - create the associated model"""
+        - compute the path
+        - create the associated model"""
 
         fiducialNode = self.inputFiducialNodeSelector.currentNode()
         outputPathNode = self.outputPathNodeSelector.currentNode()
@@ -494,22 +504,17 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.flythroughCollapsibleButton.enabled = numberOfControlPoints > 1
 
     def frameSliderValueChanged(self, newValue):
-        # print "frameSliderValueChanged:", newValue
-        self.flyTo(newValue)
+        self.flyTo(int(newValue))
 
     def frameSkipSliderValueChanged(self, newValue):
-        # print "frameSkipSliderValueChanged:", newValue
         self.skip = int(newValue)
 
     def frameDelaySliderValueChanged(self, newValue):
-        # print "frameDelaySliderValueChanged:", newValue
         self.timer.interval = newValue
 
     def viewAngleSliderValueChanged(self, newValue):
-        if not self.cameraNode:
-            return
-        # print "viewAngleSliderValueChanged:", newValue
-        self.cameraNode.GetCamera().SetViewAngle(newValue)
+        if self.cameraNode:
+            self.cameraNode.GetCamera().SetViewAngle(newValue)
 
     def onPlayButtonToggled(self, checked):
         if checked:
@@ -521,27 +526,28 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def selectControlPoints(self, mrmlNode):
         # TODO: Write me
-        pass
+        print("selectControlPoints called")
 
     def refreshOrientations(self):
         # TODO: Write me
-        pass
+        print("refreshOrientations called")
 
     def selectControlPoint(self, index):
         # TODO: Write me
-        pass
+        self.keyframeSlider
+        print(f"selectControlPoint called for Frame {int(self.keyframeSlider.value)}")
 
     def controlPointsModified(self, observer, eventid):
         # TODO: Write me
-        pass
+        print("controlPointsModified called")
 
     def controlPointModified(self, observer, eventid):
         # TODO: Write me
-        pass
+        print("controlPointModified called")
 
     def cursorModified(self, observer, eventid):
         # TODO: Write me
-        pass
+        print("cursorModified called")
 
     def flyToNext(self):
         currentStep = self.frameSlider.value
@@ -556,6 +562,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         pathPointIndex = int(pathPointIndex)
         cameraPosition = np.zeros((3,))
+        print(f"flyTo {pathPointIndex} of {self.resampledCurve.GetNumberOfControlPoints()}")
         self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
         self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
@@ -738,15 +745,21 @@ class EndoscopyLogic:
         nextPathIndex = (pathIndex + 1) % n
         cameraPosition = np.zeros((3,))
         curve.GetNthControlPointPositionWorld(pathIndex, cameraPosition)
+        # print(f"{cameraPosition = }")
         focalPointPosition = np.zeros((3,))
         curve.GetNthControlPointPositionWorld(nextPathIndex, focalPointPosition)
+        # print(f"{focalPointPosition = }")
         matrix3x3 = np.zeros((3, 3))
+        # camera forward
         matrix3x3[:, 2] = focalPointPosition - cameraPosition
         matrix3x3[:, 2] /= np.linalg.norm(matrix3x3[:, 2])
+        # camera left
         matrix3x3[:, 0] = np.cross(self.planeNormal, matrix3x3[:, 2])
         matrix3x3[:, 0] /= np.linalg.norm(matrix3x3[:, 0])
+        # camera up
         matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
         EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
+        print(f"getDefaultOrientation[{pathIndex}] ={orientation}")
         return orientation
 
     def getRelativeOrientation(self, curve, i, resultOrientation=np.zeros((4,))):
@@ -766,8 +779,10 @@ class EndoscopyLogic:
     @staticmethod
     def distanceAlongCurveOfNthControlPointPositionWorld(curve, indexOfControlPoint):
         controlPoint = curve.GetNthControlPointPositionWorld(indexOfControlPoint)
-        # Curve points are about 10-to-1 control points.  There are index+1 points in {0, ..., index}.
+        # Curve points are about 10-to-1 control points.  There are index+1 points in {0, ..., index}.  So, typically
+        # numberOfControlPoints = 10 * indexOfControlPoint + 1.
         numberOfCurvePoints = curve.GetClosestCurvePointIndexToPositionWorld(controlPoint) + 1
+        print(f"{indexOfControlPoint = }, {numberOfCurvePoints = }")
         distance = curve.GetCurveLengthWorld(0, numberOfCurvePoints)
         return distance
 
@@ -840,18 +855,18 @@ class EndoscopyLogic:
 
 class EndoscopyPathModel:
     """Create a vtkPolyData for a polyline:
-         - Add one point per path point.
-         - Add a single polyline
+    - Add one point per path point.
+    - Add a single polyline
     """
 
     def __init__(self, resampledCurve, inputMarkupsFiducialNode, outputPathNode=None, cursorType=None):
         """
-          :param resampledCurve: resampledCurve generated by EndoscopyLogic
-          :param inputMarkupsFiducialNode: input node, just used for naming the output node.
-          :param outputPathNode: output model node that stores the path points.
-          :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to change the size,
-            can jump to views by clicking on it, has more visualization options, can be scaled to fixed display size),
-            but if some applications relied on having a model node as cursor then this argument can be used to achieve that.
+        :param resampledCurve: resampledCurve generated by EndoscopyLogic
+        :param inputMarkupsFiducialNode: input node, just used for naming the output node.
+        :param outputPathNode: output model node that stores the path points.
+        :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to change the size,
+          can jump to views by clicking on it, has more visualization options, can be scaled to fixed display size),
+          but if some applications relied on having a model node as cursor then this argument can be used to achieve that.
         """
 
         self.cursorType = "markups" if cursorType is None else cursorType
