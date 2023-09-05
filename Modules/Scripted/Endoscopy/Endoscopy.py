@@ -20,7 +20,7 @@ class Endoscopy(slicer.ScriptedLoadableModule.ScriptedLoadableModule):
         self.parent.helpText = """
 Create a path model as a spline interpolation of a set of fiducial points.
 Pick the Camera to be modified by the path and the Fiducial List defining the control points.
-Clicking "Create path" will make a path model and enable the flythrough panel.
+Clicking "Create model" will make a path model and enable the flythrough panel.
 You can manually scroll through the path with the Frame slider. The Play/Pause button toggles animated flythrough.
 The Frame Skip slider speeds up the animation by skipping points on the path.
 The Frame Delay slider slows down the animation by adding more time between frames.
@@ -80,8 +80,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
                     pathFormLayout.addRow("Input Fiducial Nodes:", inputFiducialNodeSelector)
                 outputPathNodeSelector = slicer.qMRMLNodeComboBox()
                     outputPathNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)
-                    pathFormLayout.addRow("Output Path:", outputPathNodeSelector)
-                createPathButton = qt.QPushButton("Create path")
+                    pathFormLayout.addRow("Output Model:", outputPathNodeSelector)
+                createPathButton = qt.QPushButton("Create model")
                     createPathButton.connect("clicked()", self.onCreatePathButtonClicked)
                     pathFormLayout.addRow(createPathButton)
             keyframeCollapsibleButton = ctk.ctkCollapsibleButton()
@@ -189,13 +189,13 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         outputPathNodeSelector.renameEnabled = True
         outputPathNodeSelector.connect('currentNodeChanged(bool)', self.enableOrDisableCreateButton)
         print('        outputPathNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
-        pathFormLayout.addRow("Output Path:", outputPathNodeSelector)
-        print('        pathFormLayout.addRow("Output Path:", outputPathNodeSelector)')
+        pathFormLayout.addRow("Output Model:", outputPathNodeSelector)
+        print('        pathFormLayout.addRow("Output Model:", outputPathNodeSelector)')
         self.outputPathNodeSelector = outputPathNodeSelector
 
         # CreatePath button
-        createPathButton = qt.QPushButton("Create path")
-        print('    createPathButton = qt.QPushButton("Create path")')
+        createPathButton = qt.QPushButton("Create model")
+        print('    createPathButton = qt.QPushButton("Create model")')
         createPathButton.toolTip = "Create the path."
         createPathButton.enabled = False
         createPathButton.connect('clicked()', self.onCreatePathButtonClicked)
@@ -464,7 +464,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def enableOrDisableCreateButton(self):
         """Connected to both the fiducial and camera node selector. It allows to
-        enable or disable the 'create path' button."""
+        enable or disable the 'Create model' button."""
         self.createPathButton.enabled = (
             self.cameraNodeSelector.currentNode()
             and self.inputFiducialNodeSelector.currentNode()
@@ -478,10 +478,9 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             self.logic = EndoscopyLogic(self.fiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to self.logic.n - 1
             self.keyframeSlider.maximum = self.logic.n - 1
-            print(f"In onFiducialNodeModified: {self.keyframeSlider.maximum = }")
 
     def onCreatePathButtonClicked(self):
-        """Connected to 'create path' button. It allows to:
+        """Connected to 'Create model' button. It allows to:
         - compute the path
         - create the associated model"""
 
@@ -492,13 +491,12 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         numberOfControlPoints = self.logic.resampledCurve.GetNumberOfControlPoints()
         print("-> Computed path contains %d elements" % numberOfControlPoints)
 
-        print("Create Model...")
+        print("Create model...")
         model = EndoscopyPathModel(self.logic.resampledCurve, fiducialNode, outputPathNode)
         print("-> Model created")
 
         # Update frame slider range
         self.keyframeSlider.maximum = max(0, self.logic.inputCurve.GetNumberOfControlPoints() - 1)
-        print(f"In onCreatePathButtonClicked: {self.keyframeSlider.maximum = }")
         self.flythroughFrameSlider.maximum = max(0, numberOfControlPoints - 2)
 
         # Update flythrough variables
@@ -547,10 +545,11 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}"
         )
         position = self.logic.inputCurve.GetNthControlPointPositionWorld(pathPointIndex)
-        print(f"{position = }")
-        # TODO: Diving by 10 has got to be wrong; what's the right way to do this?
+        # TODO: Dividing by the magic number 10 has got to be wrong; what's the right way to do this?
         flythroughFrameSliderValue = self.logic.resampledCurve.GetClosestCurvePointIndexToPositionWorld(position) // 10
-        print(f"{flythroughFrameSliderValue = }")
+        # If we are currently playing a flythrough, end it.
+        self.flythroughPlayButton.setChecked(False)
+        # Go to the selected frame
         self.flythroughFrameSlider.value = flythroughFrameSliderValue
 
     def controlPointsModified(self, observer, eventid):
@@ -578,7 +577,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         pathPointIndex = int(pathPointIndex)
         cameraPosition = np.zeros((3,))
-        print(f"flyTo {pathPointIndex} of {self.logic.resampledCurve.GetNumberOfControlPoints()}")
+        # print(f"flyTo {pathPointIndex} of {self.logic.resampledCurve.GetNumberOfControlPoints()}")
         self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
         self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
@@ -669,7 +668,7 @@ class EndoscopyLogic:
         n = inputMarkupsFiducialNode.GetNumberOfControlPoints()
         if n < 2:
             # Need at least two points to make segments.
-            slicer.util.errorDisplay("You need at least 2 control points in order to make a fly through.", "Run Error")
+            # slicer.util.errorDisplay("You need at least 2 control points in order to make a fly through.", "Run Error")
             return False
 
         # Copy everything from the input
@@ -714,7 +713,10 @@ class EndoscopyLogic:
         n = self.inputCurve.GetNumberOfControlPoints()
         quaternionInterpolator = vtk.vtkQuaternionInterpolator()
         quaternionInterpolator.SetSearchMethod(0)  # binary search
-        quaternionInterpolator.SetInterpolationTypeToSpline()  # cubic rather than linear interpolation
+        # # Using a modified Kochanek basis
+        # quaternionInterpolator.SetInterpolationTypeToSpline()
+        # Using linear spherical interpolation
+        quaternionInterpolator.SetInterpolationTypeToLinear()
         # If the curve is closed, put the first orientation also at the end
         lastN = n if self.inputCurve.GetClassName() == "vtkMRMLMarkupsClosedCurveNode" else n - 1
         for i in range(n):
