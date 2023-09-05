@@ -45,8 +45,6 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
     def __init__(self, parent=None):
         slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget.__init__(self, parent)
         self.transform = None
-        self.inputCurve = None
-        self.resampledCurve = None
         self.skip = 0
         self.logic = None
         self.timer = qt.QTimer()
@@ -98,21 +96,21 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             flythroughCollapsibleButton = ctk.ctkCollapsibleButton()
                 self.layout.addWidget(flythroughCollapsibleButton)
                 flythroughFormLayout = qt.QFormLayout(flythroughCollapsibleButton)
-                frameSlider = ctk.ctkSliderWidget()
-                    frameSlider.connect("valueChanged(double)", self.frameSliderValueChanged)
-                    flythroughFormLayout.addRow("Frame:", frameSlider)
-                frameSkipSlider = ctk.ctkSliderWidget()
-                    frameSkipSlider.connect("valueChanged(double)", self.frameSkipSliderValueChanged)
-                    flythroughFormLayout.addRow("Frame skip:", frameSkipSlider)
-                frameDelaySlider = ctk.ctkSliderWidget()
-                    frameDelaySlider.connect("valueChanged(double)", self.frameDelaySliderValueChanged)
-                    flythroughFormLayout.addRow("Frame delay:", frameDelaySlider)
-                viewAngleSlider = ctk.ctkSliderWidget()
-                    viewAngleSlider.connect("valueChanged(double)", self.viewAngleSliderValueChanged)
-                    flythroughFormLayout.addRow("View Angle:", viewAngleSlider)
-                playButton = qt.QPushButton("Play")
-                    playButton.connect("toggled(bool)", self.onPlayButtonToggled)
-                    flythroughFormLayout.addRow(playButton)
+                flythroughFrameSlider = ctk.ctkSliderWidget()
+                    flythroughFrameSlider.connect("valueChanged(double)", self.flythroughFrameSliderValueChanged)
+                    flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)
+                flythroughFrameSkipSlider = ctk.ctkSliderWidget()
+                    flythroughFrameSkipSlider.connect("valueChanged(double)", self.flythroughFrameSkipSliderValueChanged)
+                    flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)
+                flythroughFrameDelaySlider = ctk.ctkSliderWidget()
+                    flythroughFrameDelaySlider.connect("valueChanged(double)", self.flythroughFrameDelaySliderValueChanged)
+                    flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)
+                flythroughViewAngleSlider = ctk.ctkSliderWidget()
+                    flythroughViewAngleSlider.connect("valueChanged(double)", self.flythroughViewAngleSliderValueChanged)
+                    flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)
+                flythroughPlayButton = qt.QPushButton("Play")
+                    flythroughPlayButton.connect("toggled(bool)", self.onPlayButtonToggled)
+                    flythroughFormLayout.addRow(flythroughPlayButton)
             self.layout.addStretch(1)
             self.cameraNodeObserverTags = [newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]
             self.cameraObserverTags = [newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)]
@@ -251,61 +249,67 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         print('    flythroughFormLayout = qt.QFormLayout(flythroughCollapsibleButton)')
 
         # Frame slider
-        frameSlider = ctk.ctkSliderWidget()
-        print('    frameSlider = ctk.ctkSliderWidget()')
-        frameSlider.decimals = 0
-        frameSlider.connect('valueChanged(double)', self.frameSliderValueChanged)
-        print('        frameSlider.connect("valueChanged(double)", self.frameSliderValueChanged)')
-        flythroughFormLayout.addRow("Frame:", frameSlider)
-        print('        flythroughFormLayout.addRow("Frame:", frameSlider)')
-        self.frameSlider = frameSlider
+        flythroughFrameSlider = ctk.ctkSliderWidget()
+        print('    flythroughFrameSlider = ctk.ctkSliderWidget()')
+        flythroughFrameSlider.decimals = 0
+        flythroughFrameSlider.connect('valueChanged(double)', self.flythroughFrameSliderValueChanged)
+        print('        flythroughFrameSlider.connect("valueChanged(double)", self.flythroughFrameSliderValueChanged)')
+        flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)
+        print('        flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)')
+        self.flythroughFrameSlider = flythroughFrameSlider
 
         # Frame skip slider
-        frameSkipSlider = ctk.ctkSliderWidget()
-        print('    frameSkipSlider = ctk.ctkSliderWidget()')
-        frameSkipSlider.decimals = 0
-        frameSkipSlider.minimum = 0
-        frameSkipSlider.maximum = 50
-        frameSkipSlider.connect('valueChanged(double)', self.frameSkipSliderValueChanged)
-        print('        frameSkipSlider.connect("valueChanged(double)", self.frameSkipSliderValueChanged)')
-        flythroughFormLayout.addRow("Frame skip:", frameSkipSlider)
-        print('        flythroughFormLayout.addRow("Frame skip:", frameSkipSlider)')
+        flythroughFrameSkipSlider = ctk.ctkSliderWidget()
+        print('    flythroughFrameSkipSlider = ctk.ctkSliderWidget()')
+        flythroughFrameSkipSlider.decimals = 0
+        flythroughFrameSkipSlider.minimum = 0
+        flythroughFrameSkipSlider.maximum = 50
+        flythroughFrameSkipSlider.connect('valueChanged(double)', self.flythroughFrameSkipSliderValueChanged)
+        print(
+            '        flythroughFrameSkipSlider.connect("valueChanged(double)", self.flythroughFrameSkipSliderValueChanged)'
+        )
+        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)
+        print('        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)')
 
         # Frame delay slider
-        frameDelaySlider = ctk.ctkSliderWidget()
-        print('    frameDelaySlider = ctk.ctkSliderWidget()')
-        frameDelaySlider.decimals = 0
-        frameDelaySlider.minimum = 5
-        frameDelaySlider.maximum = 100
-        frameDelaySlider.suffix = " ms"
-        frameDelaySlider.value = 20
-        frameDelaySlider.connect('valueChanged(double)', self.frameDelaySliderValueChanged)
-        print('        frameDelaySlider.connect("valueChanged(double)", self.frameDelaySliderValueChanged)')
-        flythroughFormLayout.addRow("Frame delay:", frameDelaySlider)
-        print('        flythroughFormLayout.addRow("Frame delay:", frameDelaySlider)')
+        flythroughFrameDelaySlider = ctk.ctkSliderWidget()
+        print('    flythroughFrameDelaySlider = ctk.ctkSliderWidget()')
+        flythroughFrameDelaySlider.decimals = 0
+        flythroughFrameDelaySlider.minimum = 5
+        flythroughFrameDelaySlider.maximum = 100
+        flythroughFrameDelaySlider.suffix = " ms"
+        flythroughFrameDelaySlider.value = 20
+        flythroughFrameDelaySlider.connect('valueChanged(double)', self.flythroughFrameDelaySliderValueChanged)
+        print(
+            '        flythroughFrameDelaySlider.connect("valueChanged(double)", self.flythroughFrameDelaySliderValueChanged)'
+        )
+        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)
+        print('        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)')
 
         # View angle slider
-        viewAngleSlider = ctk.ctkSliderWidget()
-        print('    viewAngleSlider = ctk.ctkSliderWidget()')
-        viewAngleSlider.decimals = 0
-        viewAngleSlider.minimum = 30
-        viewAngleSlider.maximum = 180
-        viewAngleSlider.connect('valueChanged(double)', self.viewAngleSliderValueChanged)
-        print('        viewAngleSlider.connect("valueChanged(double)", self.viewAngleSliderValueChanged)')
-        flythroughFormLayout.addRow("View Angle:", viewAngleSlider)
-        print('        flythroughFormLayout.addRow("View Angle:", viewAngleSlider)')
-        self.viewAngleSlider = viewAngleSlider
+        flythroughViewAngleSlider = ctk.ctkSliderWidget()
+        print('    flythroughViewAngleSlider = ctk.ctkSliderWidget()')
+        flythroughViewAngleSlider.decimals = 0
+        flythroughViewAngleSlider.minimum = 30
+        flythroughViewAngleSlider.maximum = 180
+        flythroughViewAngleSlider.connect('valueChanged(double)', self.flythroughViewAngleSliderValueChanged)
+        print(
+            '        flythroughViewAngleSlider.connect("valueChanged(double)", self.flythroughViewAngleSliderValueChanged)'
+        )
+        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)
+        print('        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)')
+        self.flythroughViewAngleSlider = flythroughViewAngleSlider
 
         # Play button
-        playButton = qt.QPushButton("Play")
-        print('    playButton = qt.QPushButton("Play")')
-        playButton.toolTip = "Fly through path."
-        playButton.checkable = True
-        playButton.connect('toggled(bool)', self.onPlayButtonToggled)
-        print('        playButton.connect("toggled(bool)", self.onPlayButtonToggled)')
-        flythroughFormLayout.addRow(playButton)
-        print('        flythroughFormLayout.addRow(playButton)')
-        self.playButton = playButton
+        flythroughPlayButton = qt.QPushButton("Play")
+        print('    flythroughPlayButton = qt.QPushButton("Play")')
+        flythroughPlayButton.toolTip = "Fly through path."
+        flythroughPlayButton.checkable = True
+        flythroughPlayButton.connect('toggled(bool)', self.onPlayButtonToggled)
+        print('        flythroughPlayButton.connect("toggled(bool)", self.onPlayButtonToggled)')
+        flythroughFormLayout.addRow(flythroughPlayButton)
+        print('        flythroughFormLayout.addRow(flythroughPlayButton)')
+        self.flythroughPlayButton = flythroughPlayButton
 
     def setupCursor(self):
         self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")
@@ -421,7 +425,6 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
                 'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified))'
             )
             self.logic = EndoscopyLogic(newFiducialNode)
-            self.keyframeCollapsibleButton.enabled = True
             # TODO: Maybe.  Remove old observers from pre-existing self.curveNode.
             # TODO: Maybe.  Copy newFiducialNode to self.curveNode.
             # TODO: Maybe.  Then AddObserver???
@@ -435,6 +438,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             # keyframeSlider selects a control point (not a segment) so index goes up to n - 1
             self.keyframeSlider.maximum = newFiducialNode.GetNumberOfControlPoints() - 1
         else:
+            self.flythroughCollapsibleButton.enabled = False
             self.keyframeCollapsibleButton.enabled = False
             self.keyframeSlider.maximum = 0
 
@@ -445,7 +449,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def updateWidgetFromMRML(self):
         if self.camera:
-            self.viewAngleSlider.value = self.camera.GetViewAngle()
+            self.flythroughViewAngleSlider.value = self.camera.GetViewAngle()
         if self.cameraNode:
             pass
         if self.fiducialNode:
@@ -474,6 +478,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             self.logic = EndoscopyLogic(self.fiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to self.logic.n - 1
             self.keyframeSlider.maximum = self.logic.n - 1
+            print(f"In onFiducialNodeModified: {self.keyframeSlider.maximum = }")
 
     def onCreatePathButtonClicked(self):
         """Connected to 'create path' button. It allows to:
@@ -492,37 +497,40 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         print("-> Model created")
 
         # Update frame slider range
-        self.frameSlider.maximum = max(0, numberOfControlPoints - 2)
+        self.keyframeSlider.maximum = max(0, self.logic.inputCurve.GetNumberOfControlPoints() - 1)
+        print(f"In onCreatePathButtonClicked: {self.keyframeSlider.maximum = }")
+        self.flythroughFrameSlider.maximum = max(0, numberOfControlPoints - 2)
 
         # Update flythrough variables
         self.camera = self.camera
         self.transform = model.transform
         self.planeNormal = self.logic.planeNormal
-        self.resampledCurve = self.logic.resampledCurve
 
         # Enable / Disable flythrough button
-        self.flythroughCollapsibleButton.enabled = numberOfControlPoints > 1
+        enable = numberOfControlPoints > 1
+        self.flythroughCollapsibleButton.enabled = enable
+        self.keyframeCollapsibleButton.enabled = enable
 
-    def frameSliderValueChanged(self, newValue):
+    def flythroughFrameSliderValueChanged(self, newValue):
         self.flyTo(int(newValue))
 
-    def frameSkipSliderValueChanged(self, newValue):
+    def flythroughFrameSkipSliderValueChanged(self, newValue):
         self.skip = int(newValue)
 
-    def frameDelaySliderValueChanged(self, newValue):
+    def flythroughFrameDelaySliderValueChanged(self, newValue):
         self.timer.interval = newValue
 
-    def viewAngleSliderValueChanged(self, newValue):
+    def flythroughViewAngleSliderValueChanged(self, newValue):
         if self.cameraNode:
             self.cameraNode.GetCamera().SetViewAngle(newValue)
 
     def onPlayButtonToggled(self, checked):
         if checked:
             self.timer.start()
-            self.playButton.text = "Stop"
+            self.flythroughPlayButton.text = "Stop"
         else:
             self.timer.stop()
-            self.playButton.text = "Play"
+            self.flythroughPlayButton.text = "Play"
 
     def selectControlPoints(self, mrmlNode):
         # TODO: Write me
@@ -532,10 +540,18 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         # TODO: Write me
         print("refreshOrientations called")
 
-    def selectControlPoint(self, index):
-        # TODO: Write me
-        self.keyframeSlider
-        print(f"selectControlPoint called for Frame {int(self.keyframeSlider.value)}")
+    def selectControlPoint(self, pathPointIndex):
+        pathPointIndex = int(pathPointIndex)
+        print(
+            f"selectControlPoint called for Frame {int(self.keyframeSlider.value)}"
+            + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}"
+        )
+        position = self.logic.inputCurve.GetNthControlPointPositionWorld(pathPointIndex)
+        print(f"{position = }")
+        # TODO: Diving by 10 has got to be wrong; what's the right way to do this?
+        flythroughFrameSliderValue = self.logic.resampledCurve.GetClosestCurvePointIndexToPositionWorld(position) // 10
+        print(f"{flythroughFrameSliderValue = }")
+        self.flythroughFrameSlider.value = flythroughFrameSliderValue
 
     def controlPointsModified(self, observer, eventid):
         # TODO: Write me
@@ -550,26 +566,26 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         print("cursorModified called")
 
     def flyToNext(self):
-        currentStep = self.frameSlider.value
+        currentStep = self.flythroughFrameSlider.value
         nextStep = currentStep + self.skip + 1
         if nextStep >= self.logic.resampledCurve.GetNumberOfControlPoints() - 1:
             nextStep = 0
-        self.frameSlider.value = nextStep
+        self.flythroughFrameSlider.value = nextStep
 
     def flyTo(self, pathPointIndex):
-        if self.resampledCurve is None:
+        if self.logic.resampledCurve is None:
             return
 
         pathPointIndex = int(pathPointIndex)
         cameraPosition = np.zeros((3,))
-        print(f"flyTo {pathPointIndex} of {self.resampledCurve.GetNumberOfControlPoints()}")
-        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
+        print(f"flyTo {pathPointIndex} of {self.logic.resampledCurve.GetNumberOfControlPoints()}")
+        self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
-        self.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
+        self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
 
-        defaultOrientation = self.logic.getDefaultOrientation(self.resampledCurve, pathPointIndex)
+        defaultOrientation = self.logic.getDefaultOrientation(self.logic.resampledCurve, pathPointIndex)
         relativeOrientation = np.zeros((4,))
-        self.resampledCurve.GetNthControlPointOrientation(pathPointIndex, relativeOrientation)
+        self.logic.resampledCurve.GetNthControlPointOrientation(pathPointIndex, relativeOrientation)
         resultMatrix = np.matmul(
             EndoscopyLogic.OrientationToMatrix3x3(relativeOrientation),
             EndoscopyLogic.OrientationToMatrix3x3(defaultOrientation),
@@ -658,6 +674,7 @@ class EndoscopyLogic:
 
         # Copy everything from the input
         self.inputCurve.Copy(inputMarkupsFiducialNode)
+        print("Created self.inputCurve")
         return True
 
     def setCameraPositionsFromInputCurve(self):
@@ -738,6 +755,7 @@ class EndoscopyLogic:
         return True
 
     def getDefaultOrientation(self, curve, pathIndex, orientation=np.zeros((4,))):
+        # print(f"getDefaultOrientation[{pathIndex}] = ", end="")
         n = curve.GetNumberOfControlPoints()
         # If the curve is not closed then the last control point has the same orientation as its previous control point
         if pathIndex == n - 1 and curve.GetClassName() != "vtkMRMLMarkupsClosedCurveNode":
@@ -745,10 +763,8 @@ class EndoscopyLogic:
         nextPathIndex = (pathIndex + 1) % n
         cameraPosition = np.zeros((3,))
         curve.GetNthControlPointPositionWorld(pathIndex, cameraPosition)
-        # print(f"{cameraPosition = }")
         focalPointPosition = np.zeros((3,))
         curve.GetNthControlPointPositionWorld(nextPathIndex, focalPointPosition)
-        # print(f"{focalPointPosition = }")
         matrix3x3 = np.zeros((3, 3))
         # camera forward
         matrix3x3[:, 2] = focalPointPosition - cameraPosition
@@ -759,7 +775,7 @@ class EndoscopyLogic:
         # camera up
         matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
         EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
-        print(f"getDefaultOrientation[{pathIndex}] ={orientation}")
+        # print(repr(orientation))
         return orientation
 
     def getRelativeOrientation(self, curve, i, resultOrientation=np.zeros((4,))):
@@ -779,10 +795,9 @@ class EndoscopyLogic:
     @staticmethod
     def distanceAlongCurveOfNthControlPointPositionWorld(curve, indexOfControlPoint):
         controlPoint = curve.GetNthControlPointPositionWorld(indexOfControlPoint)
-        # Curve points are about 10-to-1 control points.  There are index+1 points in {0, ..., index}.  So, typically
+        # Curve points are about 10-to-1 control points.  There are index + 1 points in {0, ..., index}.  So, typically
         # numberOfControlPoints = 10 * indexOfControlPoint + 1.
         numberOfCurvePoints = curve.GetClosestCurvePointIndexToPositionWorld(controlPoint) + 1
-        print(f"{indexOfControlPoint = }, {numberOfCurvePoints = }")
         distance = curve.GetCurveLengthWorld(0, numberOfCurvePoints)
         return distance
 
@@ -850,6 +865,10 @@ class EndoscopyLogic:
         p = points.mean(axis=1)
         points -= p[:, np.newaxis]  # Recenter on the centroid
         n = np.linalg.svd(np.dot(points, points.T))[0][:, -1]
+        # Choose the normal to be in the direction of increasing coordinate value
+        primary_direction = np.abs(n).argmax()
+        if n[primary_direction] < 0.0:
+            n *= -1.0
         return p, n
 
 
