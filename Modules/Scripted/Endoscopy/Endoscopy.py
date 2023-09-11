@@ -266,7 +266,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         flythroughFrameSkipSlider.maximum = 50
         flythroughFrameSkipSlider.connect('valueChanged(double)', self.flythroughFrameSkipSliderValueChanged)
         print(
-            '        flythroughFrameSkipSlider.connect("valueChanged(double)", self.flythroughFrameSkipSliderValueChanged)'
+            '        flythroughFrameSkipSlider.connect("valueChanged(double)", '
+            + 'self.flythroughFrameSkipSliderValueChanged)',
         )
         flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)
         print('        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)')
@@ -281,7 +282,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         flythroughFrameDelaySlider.value = 20
         flythroughFrameDelaySlider.connect('valueChanged(double)', self.flythroughFrameDelaySliderValueChanged)
         print(
-            '        flythroughFrameDelaySlider.connect("valueChanged(double)", self.flythroughFrameDelaySliderValueChanged)'
+            '        flythroughFrameDelaySlider.connect("valueChanged(double)", '
+            + 'self.flythroughFrameDelaySliderValueChanged)',
         )
         flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)
         print('        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)')
@@ -294,7 +296,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         flythroughViewAngleSlider.maximum = 180
         flythroughViewAngleSlider.connect('valueChanged(double)', self.flythroughViewAngleSliderValueChanged)
         print(
-            '        flythroughViewAngleSlider.connect("valueChanged(double)", self.flythroughViewAngleSliderValueChanged)'
+            '        flythroughViewAngleSlider.connect("valueChanged(double)", '
+            + 'self.flythroughViewAngleSliderValueChanged)',
         )
         flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)
         print('        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)')
@@ -312,6 +315,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.flythroughPlayButton = flythroughPlayButton
 
     def setupCursor(self):
+        # TODO: Write me
         self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")
         print('    self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")')
         self.cursorNode.AddControlPoint(0, 0, 0)
@@ -331,11 +335,11 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         display.SetRotationHandleVisibility(True)
         display.SetPropertiesLabelVisibility(False)
 
-        self.cursorNodeObserverTags.append(
-            self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)
-        )
+        tag = self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)
+        self.cursorNodeObserverTags.append(tag)
         print(
-            'self.cursorNodeObserverTags.append(self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified))'
+            'self.cursorNodeObserverTags.append(self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
+            + 'self.cursorModified))',
         )
         print('Where is cursorNode in the scene?')
 
@@ -343,27 +347,28 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if self.logic:
             self.logic.cleanup()
         self.logic = None
-        for tags, node in [
-            (self.cameraNodeObserverTags, self.cameraNode),
-            (self.cameraObserverTags, self.camera),
-            (self.cursorNodeObserverTags, self.cursorNode),
-            (self.fiducialNodeObserverTags, self.fiducialNode),
-        ]:
-            if node:
-                for tag in tags:
-                    node.RemoveObserver(tag)
 
-        for node in [self.cursorNode, self.transform]:
-            # TODO: Is this right?
-            if node:
-                slicer.mrmlScene.RemoveNode(node)
-
+        if self.cameraNode:
+            for tag in self.cameraNodeObserverTags:
+                self.cameraNode.RemoveObserver(tag)
         self.cameraNodeObserverTags = []
         self.cameraNode = None
+
+        if self.camera:
+            for tag in self.cameraObserverTags:
+                self.camera.RemoveObserver(tag)
         self.cameraObserverTags = []
         self.camera = None
+
+        if self.cursorNode:
+            for tag in self.cursorNodeObserverTags:
+                self.cursorNode.RemoveObserver(tag)
         self.cursorNodeObserverTags = []
         self.cursorNode = None
+
+        if self.fiducialNode:
+            for tag in self.fiducialNodeObserverTags:
+                self.fiducialNode.RemoveObserver(tag)
         self.fiducialNodeObserverTags = []
         self.fiducialNode = None
 
@@ -376,7 +381,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         #  Remove previous observers
         if self.cameraNode:
             for tag in self.cameraNodeObserverTags:
-                self.cameraNode.RemoveObserver(tags)
+                self.cameraNode.RemoveObserver(tag)
             self.cameraNodeObserverTags = []
         if self.camera:
             for tag in self.cameraObserverTags:
@@ -387,18 +392,18 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if newCameraNode:
             newCamera = newCameraNode.GetCamera()
             # Add CameraNode ModifiedEvent observer
-            self.cameraNodeObserverTags.append(
-                newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
-            )
+            tag = newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
+            self.cameraNodeObserverTags.append(tag)
             print(
-                'self.cameraNodeObserverTags.append(newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified))'
+                'self.cameraNodeObserverTags.append(newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
+                + 'self.onCameraNodeModified))',
             )
             # Add Camera ModifiedEvent observer
-            self.cameraObserverTags.append(
-                newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
-            )
+            tag = newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
+            self.cameraObserverTags.append(tag)
             print(
-                'self.cameraObserverTags.append(newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified))'
+                'self.cameraObserverTags.append(newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, '
+                + 'self.onCameraNodeModified))',
             )
 
         self.cameraNode = newCameraNode
@@ -418,20 +423,20 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         if newFiducialNode:
             # Add CameraNode ModifiedEvent observer
-            self.fiducialNodeObserverTags.append(
-                newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)
-            )
+            tag = newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)
+            self.fiducialNodeObserverTags.append(tag)
             print(
-                'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified))'
+                'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
+                + 'self.onFiducialNodeModified))',
             )
             self.logic = EndoscopyLogic(newFiducialNode)
-            # TODO: Maybe.  Remove old observers from pre-existing self.curveNode.
-            # TODO: Maybe.  Copy newFiducialNode to self.curveNode.
+            # TODO: Maybe.  Remove old observers from pre-existing self.inputCurve.
+            # TODO: Maybe.  Copy newFiducialNode to self.inputCurve.
             # TODO: Maybe.  Then AddObserver???
-            # self.curveNodeObserverTags.extend(
+            # self.inputCurveObserverTags.extend(
             #     [
-            #         self.curveNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
-            #         self.curveNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified),
+            #         self.inputCurve.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
+            #         self.inputCurve.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified),
             #     ]
             # )
 
@@ -468,7 +473,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.createPathButton.enabled = (
             self.cameraNodeSelector.currentNode()
             and self.inputFiducialNodeSelector.currentNode()
-            and self.outputPathNodeSelector.currentNode()
+            and self.outputPathNodeSelector.currentNode(),
         )
 
     def onFiducialNodeModified(self, observer, eventid):
@@ -530,19 +535,16 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             self.timer.stop()
             self.flythroughPlayButton.text = "Play"
 
-    def selectControlPoints(self, mrmlNode):
-        # TODO: Write me
-        print("selectControlPoints called")
-
     def refreshOrientations(self):
         # TODO: Write me
+        # TODO: Do something with the cursorNode?
         print("refreshOrientations called")
 
     def selectControlPoint(self, pathPointIndex):
         pathPointIndex = int(pathPointIndex)
         print(
             f"selectControlPoint called for Frame {int(self.keyframeSlider.value)}"
-            + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}"
+            + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}",
         )
         position = self.logic.inputCurve.GetNthControlPointPositionWorld(pathPointIndex)
         # TODO: Dividing by the magic number 10 has got to be wrong; what's the right way to do this?
@@ -551,6 +553,10 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.flythroughPlayButton.setChecked(False)
         # Go to the selected frame
         self.flythroughFrameSlider.value = flythroughFrameSliderValue
+
+        # TODO: Is the following what we want?
+        # self.cursorNode.SetCenter(position)
+        # TODO: self.cursorNode.SetAxes(self.orientations[index][0], self.orientations[index][1], self.orientations[index][2])
 
     def controlPointsModified(self, observer, eventid):
         # TODO: Write me
@@ -592,15 +598,12 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         # Build a 4x4 matrix from the 3x3 matrix and the camera position
         toParent = vtk.vtkMatrix4x4()
+        toParent.SetElement(3, 3, 1.0)
         for j in range(3):
             for i in range(3):
                 toParent.SetElement(i, j, resultMatrix[i, j])
             toParent.SetElement(3, j, 0.0)
-
-        toParent.SetElement(0, 3, cameraPosition[0])
-        toParent.SetElement(1, 3, cameraPosition[1])
-        toParent.SetElement(2, 3, cameraPosition[2])
-        toParent.SetElement(3, 3, 1.0)
+            toParent.SetElement(j, 3, cameraPosition[j])
 
         # Work on camera and cameraNode
         wasModified = self.cameraNode.StartModify()
@@ -642,9 +645,16 @@ class EndoscopyLogic:
         if not (
             self.setCurveFromFiducialInput(inputMarkupsFiducialNode)
             and self.setCameraPositionsFromInputCurve()
-            and self.setCameraOrientationsFromInputCurve()
+            and self.setCameraOrientationsFromInputCurve(),
         ):
             self.indicateFailure()
+
+        # TODO: Is the following what we want?
+        # if not self.cursorNode:
+        #     self.setupCursor()
+        # self.refreshOrientations()
+        # if self.inputCurve.GetNumberOfControlPoints() > 0:
+        #     self.selectControlPoint(0)
 
     def setCurveFromFiducialInput(self, inputMarkupsFiducialNode):
         # Make a deep copy of the input information as a vtkMRMLMarkupsCurveNode.
@@ -680,7 +690,10 @@ class EndoscopyLogic:
         # We now have the user's input as a curve.  Let's get equidistant points to represent the curve.
         resampledPoints = vtk.vtkPoints()
         slicer.vtkMRMLMarkupsCurveNode.ResamplePoints(
-            self.inputCurve.GetCurvePointsWorld(), resampledPoints, self.dl, self.inputCurve.GetCurveClosed()
+            self.inputCurve.GetCurvePointsWorld(),
+            resampledPoints,
+            self.dl,
+            self.inputCurve.GetCurveClosed(),
         )
         self.n = resampledPoints.GetNumberOfPoints()
         if self.n < 2:
@@ -726,7 +739,8 @@ class EndoscopyLogic:
             supplied = True
             if supplied or i == 0 or i == lastN:
                 distanceAlongInputCurve = EndoscopyLogic.distanceAlongCurveOfNthControlPointPositionWorld(
-                    self.inputCurve, i
+                    self.inputCurve,
+                    i,
                 )
                 orientation = np.array([0.0, 0.0, 0.0, 1.0])
                 if supplied:
@@ -885,9 +899,10 @@ class EndoscopyPathModel:
         :param resampledCurve: resampledCurve generated by EndoscopyLogic
         :param inputMarkupsFiducialNode: input node, just used for naming the output node.
         :param outputPathNode: output model node that stores the path points.
-        :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to change the size,
-          can jump to views by clicking on it, has more visualization options, can be scaled to fixed display size),
-          but if some applications relied on having a model node as cursor then this argument can be used to achieve that.
+        :param cursorType: can be 'markups' or 'model'. Markups has a number of advantages (radius it is easier to
+          change the size, can jump to views by clicking on it, has more visualization options, can be scaled to fixed
+          display size), but if some applications relied on having a model node as cursor then this argument can be used
+          to achieve that.
         """
 
         self.cursorType = "markups" if cursorType is None else cursorType
@@ -922,7 +937,8 @@ class EndoscopyPathModel:
         model = outputPathNode
         if not model:
             model = slicer.mrmlScene.AddNewNodeByClass(
-                "vtkMRMLModelNode", slicer.mrmlScene.GenerateUniqueName("Path-%s" % inputMarkupsFiducialNode.GetName())
+                "vtkMRMLModelNode",
+                slicer.mrmlScene.GenerateUniqueName("Path-%s" % inputMarkupsFiducialNode.GetName()),
             )
             model.CreateDefaultDisplayNodes()
             model.GetDisplayNode().SetColor(1, 1, 0)  # yellow
