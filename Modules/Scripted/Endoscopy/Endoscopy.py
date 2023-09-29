@@ -314,22 +314,29 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         print('        flythroughFormLayout.addRow(flythroughPlayButton)')
         self.flythroughPlayButton = flythroughPlayButton
 
-    def setupCursor(self):
-        # TODO: Write me
+    def setupCursorNode(self):
+        # TODO: Is this function doing everything it needs to do?
         self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")
         print('    self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")')
-        self.cursorNode.AddControlPoint(0, 0, 0)
-        # planeMarkupDisplayNode.SetGlyphSize(0.0001)
-        # hack to hide sphere glyph that can also be used for translating by
-        # grabbing with mouse.  We don't want the user to directly translate
-        # these planes. planeMarkupDisplayNode.SetGlyphScale(0.0001) hack to
-        # hide sphere glyph that can also be used for translating by
-        # grabbing with mouse. We don't want the user to directly translate
-        # these planes.
+
+        # TODO: Instead call selectControlPoint(0)?
+        where = (
+            # TODO: Maybe access self.logic.inputCurve instead of self.fiducialNode, here and elsewhere?
+            self.fiducialNode.GetNthControlPointPositionWorld(0)
+            if self.fiducialNode and self.fiducialNode.GetNumberOfControlPoints() > 0
+            else [0, 0, 0]
+        )
+        self.cursorNode.AddControlPointWorld(*where)
         self.cursorNode.SetNthControlPointVisibility(0, False)
-        self.cursorNode.SetNthControlPointVisibility(1, False)
-        self.cursorNode.SetSize(20.0, 20.0)
+        # hack to hide sphere glyph that can also be used for translating by grabbing with mouse.  We don't want the
+        # user to directly translate these planes.
+        print(f"{self.cursorNode.GetDisplayNode().GetGlyphSize() = }")
+        print(f"{self.cursorNode.GetDisplayNode().GetGlyphScale() = }")
+        # self.cursorNode.GetDisplayNode().SetGlyphScale(0.0001)
+        self.cursorNode.SetSize(10.0, 10.0)
         display = self.cursorNode.GetMarkupsDisplayNode()
+        # TODO: How do we hide the plane itself (while showing only the rotation handles)?
+        display.SetGlyphScale(0.0001)
         display.SetTranslationHandleVisibility(False)
         display.SetScaleHandleVisibility(False)
         display.SetRotationHandleVisibility(True)
@@ -341,7 +348,10 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             'self.cursorNodeObserverTags.append(self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
             + 'self.cursorModified))',
         )
-        print('Where is cursorNode in the scene?')
+        # We've placed the control point; don't have the user place more
+        interactionNode = slicer.mrmlScene.GetNodeByID("vtkMRMLInteractionNodeSingleton")
+        interactionNode.SwitchToViewTransformMode()
+        interactionNode.SetPlaceModePersistence(0)
 
     def cleanup(self):
         if self.logic:
@@ -429,16 +439,22 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
                 'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
                 + 'self.onFiducialNodeModified))',
             )
+
+            # TODO: We probably do not want to lose camera orientation information stored in self.logic, so rebuilding
+            # self.logic from scratch might not be appropriate here.
+            if self.logic:
+                self.logic.cleanup()
             self.logic = EndoscopyLogic(newFiducialNode)
-            # TODO: Maybe.  Remove old observers from pre-existing self.inputCurve.
-            # TODO: Maybe.  Copy newFiducialNode to self.inputCurve.
-            # TODO: Maybe.  Then AddObserver???
-            # self.inputCurveObserverTags.extend(
-            #     [
-            #         self.inputCurve.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
-            #         self.inputCurve.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified),
-            #     ]
-            # )
+
+            if self.logic.inputCurve and self.logic.inputCurve.GetNumberOfControlPoints() > 0:
+                self.selectControlPoint(0)
+                # TODO: Maybe add observer tag so user can select control point with mouse?:
+                # self.fiducialNodeObserverTags.extend(
+                #     [
+                #         newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.controlPointsModified),
+                #         newFiducialNode.AddObserver(slicer.vtkMRMLMarkupsNode.PointModifiedEvent, self.controlPointModified),
+                #     ]
+                # )
 
             # keyframeSlider selects a control point (not a segment) so index goes up to n - 1
             self.keyframeSlider.maximum = newFiducialNode.GetNumberOfControlPoints() - 1
@@ -458,8 +474,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         if self.cameraNode:
             pass
         if self.fiducialNode:
-            # TODO: We should correctly read the number of points and update the keyframes
-            pass
+            self.keyframeSlider.maximum = self.fiducialNode.GetNumberOfControlPoints() - 1
+            # TODO: Are there other widgets that we should update at this point?
 
     def onCameraModified(self, observer, eventid):
         self.updateWidgetFromMRML()
@@ -480,6 +496,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         """If the fiducial was changed we need to repopulate the keyframe UI"""
         # Hack rebuild path just to get the new data
         if self.fiducialNode:
+            if self.logic:
+                self.logic.cleanup()
             self.logic = EndoscopyLogic(self.fiducialNode)
             # keyframeSlider selects a control point (not a segment) so index goes up to self.logic.n - 1
             self.keyframeSlider.maximum = self.logic.n - 1
@@ -492,6 +510,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         fiducialNode = self.inputFiducialNodeSelector.currentNode()
         outputPathNode = self.outputPathNodeSelector.currentNode()
         print("Calculating Path...")
+        if self.logic:
+            self.logic.cleanup()
         self.logic = EndoscopyLogic(fiducialNode)
         numberOfControlPoints = self.logic.resampledCurve.GetNumberOfControlPoints()
         print("-> Computed path contains %d elements" % numberOfControlPoints)
@@ -514,6 +534,11 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.flythroughCollapsibleButton.enabled = enable
         self.keyframeCollapsibleButton.enabled = enable
 
+        # Now that we have a path, we give the user the option to change the camera orientations
+        self.setupCursorNode()
+        # TODO: Should we call refreshOrientations here?
+        self.refreshOrientations()
+
     def flythroughFrameSliderValueChanged(self, newValue):
         self.flyTo(int(newValue))
 
@@ -521,7 +546,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.skip = int(newValue)
 
     def flythroughFrameDelaySliderValueChanged(self, newValue):
-        self.timer.interval = newValue
+        self.timer.setInterval(newValue)
 
     def flythroughViewAngleSliderValueChanged(self, newValue):
         if self.cameraNode:
@@ -536,7 +561,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             self.flythroughPlayButton.text = "Play"
 
     def refreshOrientations(self):
-        # TODO: Write me
+        # TODO: What should this function do?  Write me.
         # TODO: Do something with the cursorNode?
         print("refreshOrientations called")
 
@@ -547,28 +572,40 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}",
         )
         position = self.logic.inputCurve.GetNthControlPointPositionWorld(pathPointIndex)
-        # TODO: Dividing by the magic number 10 has got to be wrong; what's the right way to do this?
-        flythroughFrameSliderValue = self.logic.resampledCurve.GetClosestCurvePointIndexToPositionWorld(position) // 10
+        flythroughFrameSliderValue = self.logic.resampledCurve.GetClosestCurvePointIndexToPositionWorld(position)
+        flythroughFrameSliderValue //= self.logic.resampledCurve.GetNumberOfPointsPerInterpolatingSegment()
         # If we are currently playing a flythrough, end it.
         self.flythroughPlayButton.setChecked(False)
         # Go to the selected frame
-        self.flythroughFrameSlider.value = flythroughFrameSliderValue
+        self.flythroughFrameSlider.value = flythroughFrameSliderValue  # Calls self.flyTo
 
-        # TODO: Is the following what we want?
-        # self.cursorNode.SetCenter(position)
-        # TODO: self.cursorNode.SetAxes(self.orientations[index][0], self.orientations[index][1], self.orientations[index][2])
+        if self.cursorNode:
+            self.cursorNode.SetNthControlPointPositionWorld(0, position)
+            # TODO: Fetch current orientation and set the cursorNode and camera accordingly.  Perhaps including:
+            # TODO: self.cursorNode.SetAxes(self.orientations[index][0], self.orientations[index][1], self.orientations[index][2])
 
     def controlPointsModified(self, observer, eventid):
-        # TODO: Write me
+        # TODO: What should this function do?  Write me.
         print("controlPointsModified called")
 
     def controlPointModified(self, observer, eventid):
-        # TODO: Write me
+        # TODO: What should this function do?  Write me.
         print("controlPointModified called")
 
     def cursorModified(self, observer, eventid):
-        # TODO: Write me
         print("cursorModified called")
+        toParent = vtk.vtkMatrix4x4()
+        self.cursorNode.GetObjectToWorldMatrix(toParent)
+        spatialMatrix3x3 = np.zeros((3, 3))
+        for i in range(3):
+            for j in range(3):
+                spatialMatrix3x3[i, j] = toParent.GetElement(i, j)
+        spatialOrientation = EndoscopyLogic.Matrix3x3ToOrientation(spatialMatrix3x3)
+        keyframeIndex = int(self.keyframeSlider.value)
+        self.logic.inputCurve.SetNthControlPointOrientation(keyframeIndex, *spatialOrientation)
+        # TODO: Maybe rebuild quaternion interpolator.
+        # TODO: Maybe reorient camera by calling self.flyTo.  (Can we re-orient while we are still holding the
+        # vtkMRMLMarkupsPlaneNode rotation handle?)
 
     def flyToNext(self):
         currentStep = self.flythroughFrameSlider.value
@@ -583,7 +620,6 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         pathPointIndex = int(pathPointIndex)
         cameraPosition = np.zeros((3,))
-        # print(f"flyTo {pathPointIndex} of {self.logic.resampledCurve.GetNumberOfControlPoints()}")
         self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex, cameraPosition)
         focalPointPosition = np.zeros((3,))
         self.logic.resampledCurve.GetNthControlPointPositionWorld(pathPointIndex + 1, focalPointPosition)
@@ -611,8 +647,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.camera.SetFocalPoint(*focalPointPosition)
         self.camera.OrthogonalizeViewUp()
         self.transform.SetMatrixTransformToParent(toParent)
-        self.cameraNode.EndModify(wasModified)
         self.cameraNode.ResetClippingRange()
+        self.cameraNode.EndModify(wasModified)
 
 
 class EndoscopyLogic:
@@ -648,13 +684,6 @@ class EndoscopyLogic:
             and self.setCameraOrientationsFromInputCurve(),
         ):
             self.indicateFailure()
-
-        # TODO: Is the following what we want?
-        # if not self.cursorNode:
-        #     self.setupCursor()
-        # self.refreshOrientations()
-        # if self.inputCurve.GetNumberOfControlPoints() > 0:
-        #     self.selectControlPoint(0)
 
     def setCurveFromFiducialInput(self, inputMarkupsFiducialNode):
         # Make a deep copy of the input information as a vtkMRMLMarkupsCurveNode.
