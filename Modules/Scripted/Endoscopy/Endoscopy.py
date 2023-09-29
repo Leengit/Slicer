@@ -1,9 +1,12 @@
 import ctk
+import logging
 import numpy as np
 import qt
 import slicer
 import vtk
 import vtk.util.numpy_support
+from slicer.i18n import tr as _
+from slicer.i18n import translate
 
 
 class Endoscopy(slicer.ScriptedLoadableModule.ScriptedLoadableModule):
@@ -13,11 +16,11 @@ class Endoscopy(slicer.ScriptedLoadableModule.ScriptedLoadableModule):
 
     def __init__(self, parent):
         slicer.ScriptedLoadableModule.ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "Endoscopy"
-        self.parent.categories = ["Endoscopy"]
+        self.parent.title = _("Endoscopy")
+        self.parent.categories = [translate("qSlicerAbstractCoreModule", "Endoscopy")]
         self.parent.dependencies = []
         self.parent.contributors = ["Steve Pieper (Isomics)", "Harald Scheirich (Kitware)", "Lee Newberg (Kitware)"]
-        self.parent.helpText = """
+        self.parent.helpText = _("""
 Create a path model as a spline interpolation of a set of fiducial points.
 Pick the Camera to be modified by the path and the Fiducial List defining the control points.
 Clicking "Create model" will make a path model and enable the flythrough panel.
@@ -25,13 +28,13 @@ You can manually scroll through the path with the Frame slider. The Play/Pause b
 The Frame Skip slider speeds up the animation by skipping points on the path.
 The Frame Delay slider slows down the animation by adding more time between frames.
 The View Angle provides is used to approximate the optics of an endoscopy system.
-"""
+""")
         self.parent.helpText += self.getDefaultModuleDocumentationLink()
-        self.parent.acknowledgementText = """
+        self.parent.acknowledgementText = _("""
 This work is supported by PAR-07-249: R01CA131718 NA-MIC Virtual Colonoscopy
 (See <a>https://www.na-mic.org/Wiki/index.php/NA-MIC_NCBC_Collaboration:NA-MIC_virtual_colonoscopy</a>)
 NA-MIC, NAC, BIRN, NCIGT, and the Slicer Community.
-"""
+""")
 
 
 class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget):
@@ -48,10 +51,10 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.skip = 0
         self.logic = None
         self.timer = qt.QTimer()
-        print('        self.timer = qt.QTimer()')
+        logging.debug('        self.timer = qt.QTimer()')
         self.timer.setInterval(20)
         self.timer.connect('timeout()', self.flyToNext)
-        print('            self.timer.connect("timeout()", self.flyToNext)')
+        logging.debug('            self.timer.connect("timeout()", self.flyToNext)')
 
         self.cameraNodeObserverTags = []
         self.cameraNode = None
@@ -125,7 +128,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         # Add vertical spacer
         self.layout.addStretch(1)
-        print('self.layout.addStretch(1)')
+        logging.debug('self.layout.addStretch(1)')
 
         self.cameraNodeSelector.setMRMLScene(slicer.mrmlScene)
         self.inputFiducialNodeSelector.setMRMLScene(slicer.mrmlScene)
@@ -134,190 +137,190 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
     def setupPathUI(self):
         # Path collapsible button
         pathCollapsibleButton = ctk.ctkCollapsibleButton()
-        print('pathCollapsibleButton = ctk.ctkCollapsibleButton()')
-        pathCollapsibleButton.text = "Path"
+        logging.debug('pathCollapsibleButton = ctk.ctkCollapsibleButton()')
+        pathCollapsibleButton.text = _("Path")
         self.layout.addWidget(pathCollapsibleButton)
-        print('    self.layout.addWidget(pathCollapsibleButton)')
+        logging.debug('    self.layout.addWidget(pathCollapsibleButton)')
 
         # Layout within the path collapsible button
         pathFormLayout = qt.QFormLayout(pathCollapsibleButton)
-        print('    pathFormLayout = qt.QFormLayout(pathCollapsibleButton)')
+        logging.debug('    pathFormLayout = qt.QFormLayout(pathCollapsibleButton)')
 
         # Camera node selector
         cameraNodeSelector = slicer.qMRMLNodeComboBox()
-        print('    cameraNodeSelector = slicer.qMRMLNodeComboBox()')
+        logging.debug('    cameraNodeSelector = slicer.qMRMLNodeComboBox()')
         cameraNodeSelector.objectName = 'cameraNodeSelector'
-        cameraNodeSelector.toolTip = "Select a camera that will fly along this path."
+        cameraNodeSelector.toolTip = _("Select a camera that will fly along this path.")
         cameraNodeSelector.nodeTypes = ['vtkMRMLCameraNode']
         cameraNodeSelector.noneEnabled = False
         cameraNodeSelector.addEnabled = False
         cameraNodeSelector.removeEnabled = False
         cameraNodeSelector.connect('currentNodeChanged(bool)', self.enableOrDisableCreateButton)
-        print('        cameraNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
+        logging.debug('        cameraNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
         cameraNodeSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.setCameraNode)
-        print('        cameraNodeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.setCameraNode)')
-        pathFormLayout.addRow("Camera:", cameraNodeSelector)
-        print('        pathFormLayout.addRow("Camera:", cameraNodeSelector)')
+        logging.debug('        cameraNodeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.setCameraNode)')
+        pathFormLayout.addRow(_("Camera:"), cameraNodeSelector)
+        logging.debug('        pathFormLayout.addRow("Camera:", cameraNodeSelector)')
         self.cameraNodeSelector = cameraNodeSelector
 
         # Input fiducial node selector
         inputFiducialNodeSelector = slicer.qMRMLNodeComboBox()
-        print('    inputFiducialNodeSelector = slicer.qMRMLNodeComboBox()')
+        logging.debug('    inputFiducialNodeSelector = slicer.qMRMLNodeComboBox()')
         inputFiducialNodeSelector.objectName = 'inputFiducialNodeSelector'
-        inputFiducialNodeSelector.toolTip = "Select a fiducial list to define control points for the path."
+        inputFiducialNodeSelector.toolTip = _("Select a fiducial list to define control points for the path.")
         inputFiducialNodeSelector.nodeTypes = ['vtkMRMLMarkupsFiducialNode', 'vtkMRMLMarkupsCurveNode']
         inputFiducialNodeSelector.noneEnabled = False
         inputFiducialNodeSelector.addEnabled = False
         inputFiducialNodeSelector.removeEnabled = False
         inputFiducialNodeSelector.connect('currentNodeChanged(bool)', self.enableOrDisableCreateButton)
-        print('        inputFiducialNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
+        logging.debug('        inputFiducialNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
         inputFiducialNodeSelector.connect('currentNodeChanged(vtkMRMLNode*)', self.setFiducialNode)
-        print('        inputFiducialNodeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.setFiducialNode)')
-        pathFormLayout.addRow("Input Fiducial Nodes:", inputFiducialNodeSelector)
-        print('        pathFormLayout.addRow("Input Fiducial Nodes:", inputFiducialNodeSelector)')
+        logging.debug('        inputFiducialNodeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.setFiducialNode)')
+        pathFormLayout.addRow(_("Input Fiducial Nodes:"), inputFiducialNodeSelector)
+        logging.debug('        pathFormLayout.addRow("Input Fiducial Nodes:", inputFiducialNodeSelector)')
         self.inputFiducialNodeSelector = inputFiducialNodeSelector
 
         # Output path node selector
         outputPathNodeSelector = slicer.qMRMLNodeComboBox()
-        print('    outputPathNodeSelector = slicer.qMRMLNodeComboBox()')
+        logging.debug('    outputPathNodeSelector = slicer.qMRMLNodeComboBox()')
         outputPathNodeSelector.objectName = 'outputPathNodeSelector'
-        outputPathNodeSelector.toolTip = "Select a fiducial list to define control points for the path."
+        outputPathNodeSelector.toolTip = _("Select a fiducial list to define control points for the path.")
         outputPathNodeSelector.nodeTypes = ['vtkMRMLModelNode']
         outputPathNodeSelector.noneEnabled = False
         outputPathNodeSelector.addEnabled = True
         outputPathNodeSelector.removeEnabled = True
         outputPathNodeSelector.renameEnabled = True
         outputPathNodeSelector.connect('currentNodeChanged(bool)', self.enableOrDisableCreateButton)
-        print('        outputPathNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
-        pathFormLayout.addRow("Output Model:", outputPathNodeSelector)
-        print('        pathFormLayout.addRow("Output Model:", outputPathNodeSelector)')
+        logging.debug('        outputPathNodeSelector.connect("currentNodeChanged(bool)", self.enableOrDisableCreateButton)')
+        pathFormLayout.addRow(_("Output Model:"), outputPathNodeSelector)
+        logging.debug('        pathFormLayout.addRow("Output Model:", outputPathNodeSelector)')
         self.outputPathNodeSelector = outputPathNodeSelector
 
         # CreatePath button
-        createPathButton = qt.QPushButton("Create model")
-        print('    createPathButton = qt.QPushButton("Create model")')
-        createPathButton.toolTip = "Create the path."
+        createPathButton = qt.QPushButton(_("Create model"))
+        logging.debug('    createPathButton = qt.QPushButton("Create model")')
+        createPathButton.toolTip = _("Create the path.")
         createPathButton.enabled = False
         createPathButton.connect('clicked()', self.onCreatePathButtonClicked)
-        print('        createPathButton.connect("clicked()", self.onCreatePathButtonClicked)')
+        logging.debug('        createPathButton.connect("clicked()", self.onCreatePathButtonClicked)')
         pathFormLayout.addRow(createPathButton)
-        print('        pathFormLayout.addRow(createPathButton)')
+        logging.debug('        pathFormLayout.addRow(createPathButton)')
         self.createPathButton = createPathButton
 
     def setupKeyframeUI(self):
         keyframeCollapsibleButton = ctk.ctkCollapsibleButton()
-        print('keyframeCollapsibleButton = ctk.ctkCollapsibleButton()')
-        keyframeCollapsibleButton.text = "Keyframes"
+        logging.debug('keyframeCollapsibleButton = ctk.ctkCollapsibleButton()')
+        keyframeCollapsibleButton.text = _("Keyframes")
         keyframeCollapsibleButton.enabled = False
         self.layout.addWidget(keyframeCollapsibleButton)
-        print('    self.layout.addWidget(keyframeCollapsibleButton)')
+        logging.debug('    self.layout.addWidget(keyframeCollapsibleButton)')
         self.keyframeCollapsibleButton = keyframeCollapsibleButton
 
         keyframeLayout = qt.QFormLayout(keyframeCollapsibleButton)
-        print('    keyframeLayout = qt.QFormLayout(keyframeCollapsibleButton)')
+        logging.debug('    keyframeLayout = qt.QFormLayout(keyframeCollapsibleButton)')
 
         # KeyFrame slider
         keyframeSlider = ctk.ctkSliderWidget()
-        print('    keyframeSlider = ctk.ctkSliderWidget()')
+        logging.debug('    keyframeSlider = ctk.ctkSliderWidget()')
         keyframeSlider.decimals = 0
         keyframeSlider.minimum = 0
         keyframeSlider.connect('valueChanged(double)', self.selectControlPoint)
-        print('        keyframeSlider.connect("valueChanged(double)", self.selectControlPoint)')
-        keyframeLayout.addRow("Frame:", keyframeSlider)
-        print('        keyframeLayout.addRow("Frame:", keyframeSlider)')
+        logging.debug('        keyframeSlider.connect("valueChanged(double)", self.selectControlPoint)')
+        keyframeLayout.addRow(_("Frame:"), keyframeSlider)
+        logging.debug('        keyframeLayout.addRow("Frame:", keyframeSlider)')
         self.keyframeSlider = keyframeSlider
 
-        refreshButton = qt.QPushButton("Refresh Rotations")
-        print('    refreshButton = qt.QPushButton("Refresh Rotations")')
+        refreshButton = qt.QPushButton(_("Refresh Rotations"))
+        logging.debug('    refreshButton = qt.QPushButton("Refresh Rotations")')
         refreshButton.connect('clicked()', self.refreshOrientations)
-        print('        refreshButton.connect("clicked()", self.refreshOrientations)')
+        logging.debug('        refreshButton.connect("clicked()", self.refreshOrientations)')
         keyframeLayout.addRow(refreshButton)
-        print('        keyframeLayout.addRow(refreshButton)')
+        logging.debug('        keyframeLayout.addRow(refreshButton)')
 
     def setupFlythroughUI(self):
         # Flythrough collapsible button
         flythroughCollapsibleButton = ctk.ctkCollapsibleButton()
-        print('flythroughCollapsibleButton = ctk.ctkCollapsibleButton()')
-        flythroughCollapsibleButton.text = "Flythrough"
+        logging.debug('flythroughCollapsibleButton = ctk.ctkCollapsibleButton()')
+        flythroughCollapsibleButton.text = _("Flythrough")
         flythroughCollapsibleButton.enabled = False
         self.layout.addWidget(flythroughCollapsibleButton)
-        print('    self.layout.addWidget(flythroughCollapsibleButton)')
+        logging.debug('    self.layout.addWidget(flythroughCollapsibleButton)')
         self.flythroughCollapsibleButton = flythroughCollapsibleButton
 
         # Layout within the Flythrough collapsible button
         flythroughFormLayout = qt.QFormLayout(flythroughCollapsibleButton)
-        print('    flythroughFormLayout = qt.QFormLayout(flythroughCollapsibleButton)')
+        logging.debug('    flythroughFormLayout = qt.QFormLayout(flythroughCollapsibleButton)')
 
         # Frame slider
         flythroughFrameSlider = ctk.ctkSliderWidget()
-        print('    flythroughFrameSlider = ctk.ctkSliderWidget()')
+        logging.debug('    flythroughFrameSlider = ctk.ctkSliderWidget()')
         flythroughFrameSlider.decimals = 0
         flythroughFrameSlider.connect('valueChanged(double)', self.flythroughFrameSliderValueChanged)
-        print('        flythroughFrameSlider.connect("valueChanged(double)", self.flythroughFrameSliderValueChanged)')
-        flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)
-        print('        flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)')
+        logging.debug('        flythroughFrameSlider.connect("valueChanged(double)", self.flythroughFrameSliderValueChanged)')
+        flythroughFormLayout.addRow(_("Frame:"), flythroughFrameSlider)
+        logging.debug('        flythroughFormLayout.addRow("Frame:", flythroughFrameSlider)')
         self.flythroughFrameSlider = flythroughFrameSlider
 
         # Frame skip slider
         flythroughFrameSkipSlider = ctk.ctkSliderWidget()
-        print('    flythroughFrameSkipSlider = ctk.ctkSliderWidget()')
+        logging.debug('    flythroughFrameSkipSlider = ctk.ctkSliderWidget()')
         flythroughFrameSkipSlider.decimals = 0
         flythroughFrameSkipSlider.minimum = 0
         flythroughFrameSkipSlider.maximum = 50
         flythroughFrameSkipSlider.connect('valueChanged(double)', self.flythroughFrameSkipSliderValueChanged)
-        print(
+        logging.debug(
             '        flythroughFrameSkipSlider.connect("valueChanged(double)", '
             + 'self.flythroughFrameSkipSliderValueChanged)',
         )
-        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)
-        print('        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)')
+        flythroughFormLayout.addRow(_("Frame skip:"), flythroughFrameSkipSlider)
+        logging.debug('        flythroughFormLayout.addRow("Frame skip:", flythroughFrameSkipSlider)')
 
         # Frame delay slider
         flythroughFrameDelaySlider = ctk.ctkSliderWidget()
-        print('    flythroughFrameDelaySlider = ctk.ctkSliderWidget()')
+        logging.debug('    flythroughFrameDelaySlider = ctk.ctkSliderWidget()')
         flythroughFrameDelaySlider.decimals = 0
         flythroughFrameDelaySlider.minimum = 5
         flythroughFrameDelaySlider.maximum = 100
         flythroughFrameDelaySlider.suffix = " ms"
         flythroughFrameDelaySlider.value = 20
         flythroughFrameDelaySlider.connect('valueChanged(double)', self.flythroughFrameDelaySliderValueChanged)
-        print(
+        logging.debug(
             '        flythroughFrameDelaySlider.connect("valueChanged(double)", '
             + 'self.flythroughFrameDelaySliderValueChanged)',
         )
-        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)
-        print('        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)')
+        flythroughFormLayout.addRow(_("Frame delay:"), flythroughFrameDelaySlider)
+        logging.debug('        flythroughFormLayout.addRow("Frame delay:", flythroughFrameDelaySlider)')
 
         # View angle slider
         flythroughViewAngleSlider = ctk.ctkSliderWidget()
-        print('    flythroughViewAngleSlider = ctk.ctkSliderWidget()')
+        logging.debug('    flythroughViewAngleSlider = ctk.ctkSliderWidget()')
         flythroughViewAngleSlider.decimals = 0
         flythroughViewAngleSlider.minimum = 30
         flythroughViewAngleSlider.maximum = 180
         flythroughViewAngleSlider.connect('valueChanged(double)', self.flythroughViewAngleSliderValueChanged)
-        print(
+        logging.debug(
             '        flythroughViewAngleSlider.connect("valueChanged(double)", '
             + 'self.flythroughViewAngleSliderValueChanged)',
         )
-        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)
-        print('        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)')
+        flythroughFormLayout.addRow(_("View Angle:"), flythroughViewAngleSlider)
+        logging.debug('        flythroughFormLayout.addRow("View Angle:", flythroughViewAngleSlider)')
         self.flythroughViewAngleSlider = flythroughViewAngleSlider
 
         # Play button
-        flythroughPlayButton = qt.QPushButton("Play")
-        print('    flythroughPlayButton = qt.QPushButton("Play")')
-        flythroughPlayButton.toolTip = "Fly through path."
+        flythroughPlayButton = qt.QPushButton(_("Play"))
+        logging.debug('    flythroughPlayButton = qt.QPushButton("Play")')
+        flythroughPlayButton.toolTip = _("Fly through path.")
         flythroughPlayButton.checkable = True
         flythroughPlayButton.connect('toggled(bool)', self.onPlayButtonToggled)
-        print('        flythroughPlayButton.connect("toggled(bool)", self.onPlayButtonToggled)')
+        logging.debug('        flythroughPlayButton.connect("toggled(bool)", self.onPlayButtonToggled)')
         flythroughFormLayout.addRow(flythroughPlayButton)
-        print('        flythroughFormLayout.addRow(flythroughPlayButton)')
+        logging.debug('        flythroughFormLayout.addRow(flythroughPlayButton)')
         self.flythroughPlayButton = flythroughPlayButton
 
     def setupCursorNode(self):
         # TODO: Is this function doing everything it needs to do?
         self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")
-        print('    self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")')
+        logging.debug('    self.cursorNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsPlaneNode", "EndoscopyCursor")')
 
         # TODO: Instead call selectControlPoint(0)?
         where = (
@@ -330,8 +333,8 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
         self.cursorNode.SetNthControlPointVisibility(0, False)
         # hack to hide sphere glyph that can also be used for translating by grabbing with mouse.  We don't want the
         # user to directly translate these planes.
-        print(f"{self.cursorNode.GetDisplayNode().GetGlyphSize() = }")
-        print(f"{self.cursorNode.GetDisplayNode().GetGlyphScale() = }")
+        logging.debug(f"{self.cursorNode.GetDisplayNode().GetGlyphSize() = }")
+        logging.debug(f"{self.cursorNode.GetDisplayNode().GetGlyphScale() = }")
         # self.cursorNode.GetDisplayNode().SetGlyphScale(0.0001)
         self.cursorNode.SetSize(10.0, 10.0)
         display = self.cursorNode.GetMarkupsDisplayNode()
@@ -344,7 +347,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         tag = self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.cursorModified)
         self.cursorNodeObserverTags.append(tag)
-        print(
+        logging.debug(
             'self.cursorNodeObserverTags.append(self.cursorNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
             + 'self.cursorModified))',
         )
@@ -404,14 +407,14 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             # Add CameraNode ModifiedEvent observer
             tag = newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
             self.cameraNodeObserverTags.append(tag)
-            print(
+            logging.debug(
                 'self.cameraNodeObserverTags.append(newCameraNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
                 + 'self.onCameraNodeModified))',
             )
             # Add Camera ModifiedEvent observer
             tag = newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onCameraNodeModified)
             self.cameraObserverTags.append(tag)
-            print(
+            logging.debug(
                 'self.cameraObserverTags.append(newCamera.AddObserver(vtk.vtkCommand.ModifiedEvent, '
                 + 'self.onCameraNodeModified))',
             )
@@ -435,7 +438,7 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
             # Add CameraNode ModifiedEvent observer
             tag = newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, self.onFiducialNodeModified)
             self.fiducialNodeObserverTags.append(tag)
-            print(
+            logging.debug(
                 'self.fiducialNodeObserverTags.append(newFiducialNode.AddObserver(vtk.vtkCommand.ModifiedEvent, '
                 + 'self.onFiducialNodeModified))',
             )
@@ -509,16 +512,16 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
         fiducialNode = self.inputFiducialNodeSelector.currentNode()
         outputPathNode = self.outputPathNodeSelector.currentNode()
-        print("Calculating Path...")
+        logging.debug("Calculating Path...")
         if self.logic:
             self.logic.cleanup()
         self.logic = EndoscopyLogic(fiducialNode)
         numberOfControlPoints = self.logic.resampledCurve.GetNumberOfControlPoints()
-        print("-> Computed path contains %d elements" % numberOfControlPoints)
+        logging.debug(f"-> Computed path contains {numberOfControlPoints} elements")
 
-        print("Create model...")
+        logging.debug("Create model...")
         model = EndoscopyPathModel(self.logic.resampledCurve, fiducialNode, outputPathNode)
-        print("-> Model created")
+        logging.debug("-> Model created")
 
         # Update frame slider range
         self.keyframeSlider.maximum = max(0, self.logic.inputCurve.GetNumberOfControlPoints() - 1)
@@ -555,19 +558,19 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
     def onPlayButtonToggled(self, checked):
         if checked:
             self.timer.start()
-            self.flythroughPlayButton.text = "Stop"
+            self.flythroughPlayButton.text = _("Stop")
         else:
             self.timer.stop()
-            self.flythroughPlayButton.text = "Play"
+            self.flythroughPlayButton.text = _("Play")
 
     def refreshOrientations(self):
         # TODO: What should this function do?  Write me.
         # TODO: Do something with the cursorNode?
-        print("refreshOrientations called")
+        logging.debug("refreshOrientations called")
 
     def selectControlPoint(self, pathPointIndex):
         pathPointIndex = int(pathPointIndex)
-        print(
+        logging.debug(
             f"selectControlPoint called for Frame {int(self.keyframeSlider.value)}"
             + f" out of {self.logic.inputCurve.GetNumberOfControlPoints()}",
         )
@@ -586,14 +589,14 @@ class EndoscopyWidget(slicer.ScriptedLoadableModule.ScriptedLoadableModuleWidget
 
     def controlPointsModified(self, observer, eventid):
         # TODO: What should this function do?  Write me.
-        print("controlPointsModified called")
+        logging.debug("controlPointsModified called")
 
     def controlPointModified(self, observer, eventid):
         # TODO: What should this function do?  Write me.
-        print("controlPointModified called")
+        logging.debug("controlPointModified called")
 
     def cursorModified(self, observer, eventid):
-        print("cursorModified called")
+        logging.debug("cursorModified called")
         toParent = vtk.vtkMatrix4x4()
         self.cursorNode.GetObjectToWorldMatrix(toParent)
         spatialMatrix3x3 = np.zeros((3, 3))
@@ -659,7 +662,7 @@ class EndoscopyLogic:
 
     Example:
       self.logic = EndoscopyLogic(inputMarkupsFiducialNode)
-      print("computer path has %d elements" % self.logic.resampledCurve.GetNumberOfControlPoints())
+      print(f"computed path has {self.logic.resampledCurve.GetNumberOfControlPoints()} elements")
 
     Note:
     * `orientation` = (angle, *axis), where angle is in radians and axis is the unit 3D-vector for the axis of rotation.
@@ -712,7 +715,7 @@ class EndoscopyLogic:
 
         # Copy everything from the input
         self.inputCurve.Copy(inputMarkupsFiducialNode)
-        print("Created self.inputCurve")
+        logging.debug("Created self.inputCurve")
         return True
 
     def setCameraPositionsFromInputCurve(self):
@@ -800,7 +803,7 @@ class EndoscopyLogic:
         return True
 
     def getDefaultOrientation(self, curve, pathIndex, orientation=np.zeros((4,))):
-        # print(f"getDefaultOrientation[{pathIndex}] = ", end="")
+        # logging.debug(f"getDefaultOrientation[{pathIndex}] = ", end="")
         n = curve.GetNumberOfControlPoints()
         # If the curve is not closed then the last control point has the same orientation as its previous control point
         if pathIndex == n - 1 and curve.GetClassName() != "vtkMRMLMarkupsClosedCurveNode":
@@ -820,7 +823,7 @@ class EndoscopyLogic:
         # camera up
         matrix3x3[:, 1] = np.cross(matrix3x3[:, 2], matrix3x3[:, 0])
         EndoscopyLogic.Matrix3x3ToOrientation(matrix3x3, orientation)
-        # print(repr(orientation))
+        # logging.debug(repr(orientation))
         return orientation
 
     def getRelativeOrientation(self, curve, i, resultOrientation=np.zeros((4,))):
