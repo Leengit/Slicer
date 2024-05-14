@@ -31,8 +31,8 @@ Cut a plane into two separate meshes using any number of markup planes or slice 
 - `Cap surface`: If enabled, creates a closed surface by triangulating the clipped region.
 - `Operation type`: The method that will be used to combine multiple planes for cutting (union, intersection and difference boolean operations).
 #### Output nodes
-- `Clipped output model (positive side)`: Portion of the cut model that is on the same side of the plane as the normal.
-- `Clipped output model (negative side)`: Portion of the cut model that is on the opposite side of the plane as the normal.
+- `Clipped output model (outside)`: Portion of the cut model that is on the same side of the plane as the normal.
+- `Clipped output model (inside)`: Portion of the cut model that is on the opposite side of the plane as the normal.
 
 ### Curve cut
 Extracts a region from the surface that is enclosed by a markup curve.
