@@ -89,6 +89,8 @@ vtkMRMLSliceNode::vtkMRMLSliceNode()
   this->SlabReconstructionThickness = 1.;
   this->SlabReconstructionOversamplingFactor = 2.0;
 
+  // TODO: Initialize member variables associated with curved planar reformation
+
   this->XYZOrigin[0] = 0;
   this->XYZOrigin[1] = 0;
   this->XYZOrigin[2] = 0;
@@ -924,6 +926,8 @@ void vtkMRMLSliceNode::WriteXML(ostream& of, int nIndent)
   vtkMRMLWriteXMLFloatMacro(slabReconstructionThickness, SlabReconstructionThickness);
   vtkMRMLWriteXMLFloatMacro(slabReconstructionOversamplingFactor, SlabReconstructionOversamplingFactor);
 
+  // TODO: Write member variables associated with curved planar reformation
+
   vtkMRMLWriteXMLEndMacro();
 }
 
@@ -1015,6 +1019,8 @@ void vtkMRMLSliceNode::ReadXMLAttributes(const char** atts)
   vtkMRMLReadXMLEnumMacro(slabReconstructionType, SlabReconstructionType);
   vtkMRMLReadXMLFloatMacro(slabReconstructionThickness, SlabReconstructionThickness);
   vtkMRMLReadXMLFloatMacro(slabReconstructionOversamplingFactor, SlabReconstructionOversamplingFactor);
+
+  // TODO: Read member variables associated with curved planar reformation
 
   vtkMRMLReadXMLEndMacro();
 
@@ -1136,6 +1142,8 @@ void vtkMRMLSliceNode::CopyContent(vtkMRMLNode* anode, bool deepCopy/*=true*/)
 
   vtkMRMLCopyEndMacro();
 
+  // TODO: Copy member variables associated with curved planar reformation
+
   this->UpdateMatrices();
 }
 
@@ -1232,6 +1240,8 @@ void vtkMRMLSliceNode::PrintSelf(ostream& os, vtkIndent indent)
   vtkMRMLPrintEnumMacro(SlabReconstructionType);
   vtkMRMLPrintFloatMacro(SlabReconstructionThickness);
   vtkMRMLPrintFloatMacro(SlabReconstructionOversamplingFactor);
+
+  // TODO: Print member variables associated with curved planar reformation
 
   vtkMRMLPrintEndMacro();
 }
@@ -2094,6 +2104,9 @@ int vtkMRMLSliceNode::GetSlabReconstructionTypeFromString(const char* name)
   // unknown name
   return -1;
 }
+
+//-----------------------------------------------------------
+// TODO: Add function definitions associated with curved planar reformation
 
 //-----------------------------------------------------------
 vtkImplicitFunction* vtkMRMLSliceNode::GetImplicitFunctionWorld()

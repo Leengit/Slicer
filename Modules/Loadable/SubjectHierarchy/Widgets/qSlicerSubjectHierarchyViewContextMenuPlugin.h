@@ -72,6 +72,7 @@ protected slots:
   void setIntersectingSlicesHandlesVisible(bool);
   void setSlabReconstructionEnabled(bool);
   void setSlabReconstructionInteractive(bool);
+  // TODO: curved planar reformation too?
 
 protected:
   QScopedPointer<qSlicerSubjectHierarchyViewContextMenuPluginPrivate> d_ptr;

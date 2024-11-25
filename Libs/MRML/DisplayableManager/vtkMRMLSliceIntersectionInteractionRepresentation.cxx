@@ -79,6 +79,8 @@ static const double INTERSECTION_LINE_RESOLUTION = 50; // default = 8
 // Thick slab line
 static const double THICK_SLAB_LINE_RESOLUTION = 50; // default = 8
 
+// TODO: Curved planar reformation settings
+
 // Handles
 static const double HANDLES_CIRCLE_THETA_RESOLUTION = 100; // default = 8
 static const double HANDLES_CIRCLE_PHI_RESOLUTION = 100; // default = 8
@@ -93,6 +95,7 @@ static const double THICK_SLAB_TRANSLATION_HANDLE_DEFAULT_ORIENTATION[3] = { 0.0
 static const double THICK_SLAB_TRANSLATION_HANDLE_ARROW_RADIUS = 3.0;
 static const double THICK_SLAB_TRANSLATION_HANDLE_ARROW_LENGTH = 60.0;
 static const double THICK_SLAB_TRANSLATION_HANDLE_ARROW_TIP_ANGLE = 27; // degrees
+// TODO: Curved planar reformation handles
 static const double ROTATION_HANDLE_DEFAULT_POSITION[3] = { 0.0,0.0,0.0 };
 static const double ROTATION_HANDLE_DEFAULT_ORIENTATION[3] = { 0.0,1.0,0.0 };
 static const double ROTATION_HANDLE_CIRCLE_RADIUS = 10.0;
@@ -184,6 +187,8 @@ class SliceIntersectionInteractionDisplayPipeline
       this->ThickSlabLine2SecondHalfActor->SetMapper(this->ThickSlabLine2SecondHalfMapper);
       this->ThickSlabLine2SecondHalfActor->SetProperty(this->ThickSlabLine2SecondHalfProperty);
 
+      // TODO: Curved planar reformation
+
       // Center sphere
       this->TranslationOuterHandle = vtkSmartPointer<vtkSphereSource>::New();
       this->TranslationOuterHandle->SetRadius(TRANSLATION_HANDLE_OUTER_RADIUS);
@@ -217,12 +222,14 @@ class SliceIntersectionInteractionDisplayPipeline
       this->SetIntersectionHandlesVisibility(false);
       this->SetThickSlabHandlesVisibility(false);
       this->NeedToRender = true;
+      // TODO: Curved planar reformation
 
       // Handle points
       this->RotationHandlePoints = vtkSmartPointer<vtkPolyData>::New();
       this->TranslationHandlePoints = vtkSmartPointer<vtkPolyData>::New();
       this->SliceOffsetHandlePoints = vtkSmartPointer<vtkPolyData>::New();
       this->ThickSlabHandlePoints = vtkSmartPointer<vtkPolyData>::New();
+      // TODO: Curved planar reformation
     }
 
     //----------------------------------------------------------------------
@@ -884,6 +891,9 @@ class SliceIntersectionInteractionDisplayPipeline
     }
 
     //----------------------------------------------------------------------
+    // TODO: Define method for curved planar reformation handles
+
+    //----------------------------------------------------------------------
     void SetAndObserveSliceLogic(vtkMRMLSliceLogic* sliceLogic, vtkCallbackCommand* callback)
     {
       if (sliceLogic != this->SliceLogic || callback != this->Callback)
@@ -911,6 +921,7 @@ class SliceIntersectionInteractionDisplayPipeline
       pc->AddItem(this->ThickSlabLine1SecondHalfActor);
       pc->AddItem(this->ThickSlabLine2FirstHalfActor);
       pc->AddItem(this->ThickSlabLine2SecondHalfActor);
+      // TODO: Curved planar reformation actors
       pc->AddItem(this->TranslationOuterHandleActor);
       pc->AddItem(this->TranslationInnerHandleActor);
       pc->AddItem(this->RotationHandle1Actor);
@@ -921,6 +932,7 @@ class SliceIntersectionInteractionDisplayPipeline
       pc->AddItem(this->ThickSlabLine1Handle2Actor);
       pc->AddItem(this->ThickSlabLine2Handle1Actor);
       pc->AddItem(this->ThickSlabLine2Handle2Actor);
+      // TODO: Curved planar reformation handle actors
     }
 
     //----------------------------------------------------------------------
@@ -936,6 +948,7 @@ class SliceIntersectionInteractionDisplayPipeline
       renderer->AddViewProp(this->ThickSlabLine1SecondHalfActor);
       renderer->AddViewProp(this->ThickSlabLine2FirstHalfActor);
       renderer->AddViewProp(this->ThickSlabLine2SecondHalfActor);
+      // TODO: Curved planar reformation actors
       renderer->AddViewProp(this->TranslationOuterHandleActor);
       renderer->AddViewProp(this->TranslationInnerHandleActor);
       renderer->AddViewProp(this->RotationHandle1Actor);
@@ -946,6 +959,7 @@ class SliceIntersectionInteractionDisplayPipeline
       renderer->AddViewProp(this->ThickSlabLine1Handle2Actor);
       renderer->AddViewProp(this->ThickSlabLine2Handle1Actor);
       renderer->AddViewProp(this->ThickSlabLine2Handle2Actor);
+      // TODO: Curved planar reformation handle actors
     }
 
     //----------------------------------------------------------------------
@@ -957,6 +971,7 @@ class SliceIntersectionInteractionDisplayPipeline
       this->ThickSlabLine1SecondHalfActor->ReleaseGraphicsResources(win);
       this->ThickSlabLine2FirstHalfActor->ReleaseGraphicsResources(win);
       this->ThickSlabLine2SecondHalfActor->ReleaseGraphicsResources(win);
+      // TODO: Curved planar reformation graphic resources
       this->TranslationOuterHandleActor->ReleaseGraphicsResources(win);
       this->TranslationInnerHandleActor->ReleaseGraphicsResources(win);
       this->RotationHandle1Actor->ReleaseGraphicsResources(win);
@@ -967,6 +982,7 @@ class SliceIntersectionInteractionDisplayPipeline
       this->ThickSlabLine1Handle2Actor->ReleaseGraphicsResources(win);
       this->ThickSlabLine2Handle1Actor->ReleaseGraphicsResources(win);
       this->ThickSlabLine2Handle2Actor->ReleaseGraphicsResources(win);
+      // TODO: Curved planar reformation handle graphic resources
     }
 
     //----------------------------------------------------------------------
@@ -982,6 +998,7 @@ class SliceIntersectionInteractionDisplayPipeline
       renderer->RemoveViewProp(this->ThickSlabLine1SecondHalfActor);
       renderer->RemoveViewProp(this->ThickSlabLine2FirstHalfActor);
       renderer->RemoveViewProp(this->ThickSlabLine2SecondHalfActor);
+      // TODO: Remove curved planar reformation actors
       renderer->RemoveViewProp(this->TranslationOuterHandleActor);
       renderer->RemoveViewProp(this->TranslationInnerHandleActor);
       renderer->RemoveViewProp(this->RotationHandle1Actor);
@@ -992,6 +1009,7 @@ class SliceIntersectionInteractionDisplayPipeline
       renderer->RemoveViewProp(this->ThickSlabLine1Handle2Actor);
       renderer->RemoveViewProp(this->ThickSlabLine2Handle1Actor);
       renderer->RemoveViewProp(this->ThickSlabLine2Handle2Actor);
+      // TODO: Remove curved planar reformation handle actors
     }
 
     //----------------------------------------------------------------------
@@ -1022,6 +1040,7 @@ class SliceIntersectionInteractionDisplayPipeline
       {
         this->ThickSlabLine2SecondHalfActor->RenderOverlay(viewport);
       }
+      // TODO: render overlay for curved planar reformation actors
       if (this->TranslationOuterHandleActor->GetVisibility())
       {
         this->TranslationOuterHandleActor->RenderOverlay(viewport);
@@ -1062,6 +1081,7 @@ class SliceIntersectionInteractionDisplayPipeline
       {
         this->ThickSlabLine2Handle2Actor->RenderOverlay(viewport);
       }
+      // TODO: render overlay for curved planar reformation handle actors
       this->NeedToRender = false;
       return count;
     }
@@ -1148,6 +1168,9 @@ class SliceIntersectionInteractionDisplayPipeline
     }
 
     //----------------------------------------------------------------------
+    // TODO: set visibility for curved planar reformation handles
+
+    //----------------------------------------------------------------------
     void SetHandlesOpacity(double opacity)
     {
       this->TranslationOuterHandleProperty->SetOpacity(opacity);
@@ -1171,8 +1194,12 @@ class SliceIntersectionInteractionDisplayPipeline
     }
 
     //----------------------------------------------------------------------
+    // TODO: Get curved planar reformation visibility?
+
+    //----------------------------------------------------------------------
     bool GetVisibility()
     {
+      // TODO: Include curved planar reformation visibility?
       return this->GetIntersectionVisibility() || this->GetThickSlabVisibility();
     }
 
@@ -1207,6 +1234,8 @@ class SliceIntersectionInteractionDisplayPipeline
     vtkSmartPointer<vtkPolyDataMapper2D> ThickSlabLine2SecondHalfMapper;
     vtkSmartPointer<vtkProperty2D> ThickSlabLine2SecondHalfProperty;
     vtkSmartPointer<vtkActor2D> ThickSlabLine2SecondHalfActor;
+
+    // TODO: vtkSmartPionters for curved planar reformation
 
     vtkSmartPointer<vtkSphereSource> TranslationOuterHandle;
     vtkSmartPointer<vtkPolyDataMapper2D> TranslationOuterHandleMapper;
@@ -1273,6 +1302,7 @@ class SliceIntersectionInteractionDisplayPipeline
     vtkSmartPointer<vtkProperty2D> ThickSlabLine2Handle2Property;
     vtkSmartPointer<vtkActor2D> ThickSlabLine2Handle2Actor;
 
+    // TODO: vtkSmartPionters for curved planar reformation handles
 
     vtkWeakPointer<vtkMRMLSliceLogic> SliceLogic;
     vtkWeakPointer<vtkCallbackCommand> Callback;
@@ -1282,6 +1312,8 @@ class SliceIntersectionInteractionDisplayPipeline
     vtkSmartPointer<vtkPolyData> SliceOffsetHandlePoints;
     vtkSmartPointer<vtkPolyData> ThickSlabHandlePoints;
 
+    // TODO: vtkSmartPionters for curved planar reformation handle points?
+
     vtkSmartPointer<vtkPoints> SliceOffsetHandle1Points;
     vtkSmartPointer<vtkPoints> SliceOffsetHandle2Points;
     vtkSmartPointer<vtkPoints> RotationHandle1Points;
@@ -1290,7 +1322,6 @@ class SliceIntersectionInteractionDisplayPipeline
     vtkSmartPointer<vtkPoints> ThickSlabLine1Handle2Points;
     vtkSmartPointer<vtkPoints> ThickSlabLine2Handle1Points;
     vtkSmartPointer<vtkPoints> ThickSlabLine2Handle2Points;
-
 
     bool SliceOffsetHandle1Displayable = false;
     bool SliceOffsetHandle2Displayable = false;
@@ -1303,6 +1334,7 @@ class SliceIntersectionInteractionDisplayPipeline
     bool RotationHandlesVisible = false;
     bool TranslationHandlesVisible = false;
     bool ThickSlabHandlesVisible = false;
+    // TODO: Initialize for curved planar reformation
     int  HandlesVisibilityMode = vtkMRMLSliceDisplayNode::NeverVisible;
     int  SliceIntersectionMode = vtkMRMLSliceDisplayNode::SkipLineCrossings;
     // Indicates that this representation has changed and thus re-rendering is needed
@@ -1495,6 +1527,7 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::UpdateSliceIntersectionD
     pipeline->SetThicknessVisibility(false);
     pipeline->SetIntersectionHandlesVisibility(false);
     pipeline->SetThickSlabHandlesVisibility(false);
+    // TODO: Pipeline visibility for curved planar reformation?
     if (pipeline->NeedToRender)
     {
       this->NeedToRenderOn();
@@ -1510,6 +1543,7 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::UpdateSliceIntersectionD
     pipeline->SetThicknessVisibility(false);
     pipeline->SetIntersectionHandlesVisibility(false);
     pipeline->SetThickSlabHandlesVisibility(false);
+    // TODO: Pipeline visibility for curved planar reformation?
     if (pipeline->NeedToRender)
     {
       this->NeedToRenderOn();
@@ -1523,6 +1557,8 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::UpdateSliceIntersectionD
   bool showInteractiveSliceIntersectionLines = displayNode->GetIntersectingSlicesVisibility();
   bool showInteractiveSliceHandles = showInteractiveSliceIntersectionLines && displayNode->GetIntersectingSlicesInteractive();
 
+  // TODO: bool members for curved planar reformation handles?
+
   bool isInteractive = displayNode->GetIntersectingThickSlabInteractive() || displayNode->GetIntersectingSlicesInteractive();
   if (!((showThickSlabLines || showInteractiveSliceIntersectionLines) && isInteractive))
   {
@@ -1531,6 +1567,7 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::UpdateSliceIntersectionD
     pipeline->SetThicknessVisibility(false);
     pipeline->SetIntersectionHandlesVisibility(false);
     pipeline->SetThickSlabHandlesVisibility(false);
+    // TODO: Pipeline visibility for curved planar reformation?
     if (pipeline->NeedToRender)
     {
       this->NeedToRenderOn();
@@ -2221,6 +2258,7 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::UpdateSliceIntersectionD
     pipeline->SetThickSlabHandlesVisibility(false);
     pipeline->SetThicknessVisibility(false);
   }
+  // TODO: Process curved planar reformation?
   this->NeedToRenderOn();
 }
 
@@ -2643,6 +2681,7 @@ std::string vtkMRMLSliceIntersectionInteractionRepresentation::CanInteract(vtkMR
       vtkMRMLSliceNode* intersectingSliceNode = (*sliceIntersectionIt)->SliceLogic->GetSliceNode();
       vtkMRMLSliceDisplayNode* intersectingDisplayNode = this->GetSliceDisplayNode(intersectingSliceNode);
       bool thickSlabInteractionEnabled = intersectingDisplayNode->GetIntersectingThickSlabInteractive();
+      // TODO: Also check whether curved planar reformation is enabled?
       double opacity = 0.0;
       HandleInfoList handleInfoList = this->GetHandleInfoList((*sliceIntersectionIt));
       for (HandleInfo handleInfo : handleInfoList)
@@ -2842,6 +2881,8 @@ vtkMRMLSliceIntersectionInteractionRepresentation::GetHandleInfoList(SliceInters
     handleInfoList.push_back(info);
   }
 
+  // TODO: Also look at curve planar reformation?
+
   return handleInfoList;
 }
 
@@ -2920,6 +2961,7 @@ void vtkMRMLSliceIntersectionInteractionRepresentation::SetPipelinesHandlesVisib
     }
     (*sliceIntersectionIt)->SetIntersectionHandlesVisibility(visible);
     (*sliceIntersectionIt)->SetThickSlabHandlesVisibility(visible);
+    // TODO: Also curved planar reformation?
     if ((*sliceIntersectionIt)->NeedToRender)
     {
       this->NeedToRenderOn();

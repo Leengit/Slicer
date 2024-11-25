@@ -495,6 +495,8 @@ void vtkMRMLSliceLogic::OnMRMLNodeModified(vtkMRMLNode* node)
     vtkMRMLSliceLogic::UpdateReconstructionSlab(this, this->GetBackgroundLayer());
     vtkMRMLSliceLogic::UpdateReconstructionSlab(this, this->GetForegroundLayer());
 
+    // TODO: Update helper for curved planar reformation
+
   }
   else if (node == this->SliceCompositeNode)
   {
@@ -1030,6 +1032,9 @@ void vtkMRMLSliceLogic::UpdateReconstructionSlab(vtkMRMLSliceLogic* sliceLogic, 
 }
 
 //----------------------------------------------------------------------------
+// TODO: Define helper for curved planar reformation
+
+//----------------------------------------------------------------------------
 void vtkMRMLSliceLogic::UpdatePipeline()
 {
   int modified = 0;
@@ -1365,6 +1370,7 @@ void vtkMRMLSliceLogic::CreateSliceModel()
       sliceDisplayNode->SetIntersectingSlicesRotationEnabled(appLogic->GetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesRotation));
       // ThickSlab
       sliceDisplayNode->SetIntersectingThickSlabInteractive(appLogic->GetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesThickSlabInteractive));
+      // TODO: curved planar reformation too?
     }
 
     std::string displayName = "Slice Display";

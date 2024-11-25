@@ -471,6 +471,7 @@ public:
   ///    SliceVisibleFlag = broadcast display of slice in 3D
   ///    ResetOrientationFlag = broadcast a reset to default orientation to all linked viewers
   ///    UpdateSlabReconstructionThicknessFlag = broadcast updating the slab reconstruction thickness
+  ///    TODO: Add any flags associated with curved planar reformation
   enum InteractionFlagType
   {
     None = 0,
@@ -486,6 +487,7 @@ public:
     ResetOrientationFlag = 512,
     RotateToBackgroundVolumePlaneFlag = 1024,
     UpdateSlabReconstructionThicknessFlag = 2048,
+    // TODO: Add any flags associated with curved planar reformation
   };
 
   /// Get/Set a flag indicating what parameters are being manipulated
@@ -554,6 +556,8 @@ public:
   vtkSetMacro(SlabReconstructionOversamplingFactor, double);
   /// @}
 
+  /// TODO: Add vtkGetMacro and vtkSetMacro associated with curved planar reformation
+
   virtual vtkImplicitFunction* GetImplicitFunctionWorld();
 
 protected:
@@ -595,6 +599,8 @@ protected:
   int SlabReconstructionType;
   double SlabReconstructionThickness;
   double SlabReconstructionOversamplingFactor;
+
+  // TODO: Add member variables associated with curved planar reformation
 
   // Hold the string returned by GetOrientationString
   std::string OrientationString;

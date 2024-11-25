@@ -80,6 +80,8 @@ public:
     this->ThickSlabLine2Mapper->SetInputConnection(this->ThickSlabLine2LineSource->GetOutputPort());
     this->ThickSlabLine2Actor->SetMapper(this->ThickSlabLine2Mapper);
     this->ThickSlabLine2Actor->SetProperty(this->ThickSlabLine2Property);
+
+    // TODO: Set these for curved planar reformation too?
   }
 
   //----------------------------------------------------------------------
@@ -114,6 +116,7 @@ public:
     pc->AddItem(this->Actor);
     pc->AddItem(this->ThickSlabLine1Actor);
     pc->AddItem(this->ThickSlabLine2Actor);
+    // TODO: Curved planar reformation too?
   }
 
   //----------------------------------------------------------------------
@@ -126,6 +129,7 @@ public:
     renderer->AddViewProp(this->Actor);
     renderer->AddViewProp(this->ThickSlabLine1Actor);
     renderer->AddViewProp(this->ThickSlabLine2Actor);
+    // TODO: Curved planar reformation too?
   }
 
   //----------------------------------------------------------------------
@@ -134,6 +138,7 @@ public:
     this->Actor->ReleaseGraphicsResources(win);
     this->ThickSlabLine1Actor->ReleaseGraphicsResources(win);
     this->ThickSlabLine2Actor->ReleaseGraphicsResources(win);
+    // TODO: Curved planar reformation too?
   }
 
   //----------------------------------------------------------------------
@@ -152,6 +157,7 @@ public:
     {
       count += this->ThickSlabLine2Actor->RenderOverlay(viewport);
     }
+    // TODO: Curved planar reformation too?
     return count;
   }
 
@@ -166,6 +172,7 @@ public:
     renderer->RemoveViewProp(this->Actor);
     renderer->RemoveViewProp(this->ThickSlabLine1Actor);
     renderer->RemoveViewProp(this->ThickSlabLine2Actor);
+    // TODO: Curved planar reformation too?
   }
 
   //----------------------------------------------------------------------
@@ -194,6 +201,9 @@ public:
     return this->ThickSlabLine1Actor->GetVisibility();
   }
 
+  //----------------------------------------------------------------------
+  // TODO: Get and set methods for curved planar reformation visibility too?
+
   vtkSmartPointer<vtkLineSource> LineSource;
   vtkSmartPointer<vtkPolyDataMapper2D> Mapper;
   vtkSmartPointer<vtkProperty2D> Property;
@@ -208,6 +218,8 @@ public:
   vtkSmartPointer<vtkPolyDataMapper2D> ThickSlabLine2Mapper;
   vtkSmartPointer<vtkProperty2D> ThickSlabLine2Property;
   vtkSmartPointer<vtkActor2D> ThickSlabLine2Actor;
+
+  // TODO: vtkSmartPointers for curved planar reformation too?
 
   vtkWeakPointer<vtkMRMLSliceLogic> SliceLogic;
   vtkWeakPointer<vtkCallbackCommand> Callback;
@@ -454,6 +466,7 @@ void vtkMRMLSliceIntersectionRepresentation2D::UpdateSliceIntersectionDisplay(Sl
   {
     pipeline->SetIntersectionVisibility(false);
     pipeline->SetThickSlabVisibility(false);
+    // TODO: curved planar reformation too?
     return;
   }
 
@@ -472,16 +485,19 @@ void vtkMRMLSliceIntersectionRepresentation2D::UpdateSliceIntersectionDisplay(Sl
   {
     pipeline->SetIntersectionVisibility(false);
     pipeline->SetThickSlabVisibility(false);
+    // TODO: curved planar reformation too?
     return;
   }
   bool showThickSlabIntersectionLines = displayNode->GetIntersectingThickSlabVisibility();
   bool showSliceIntersectionLines = displayNode->GetIntersectingSlicesVisibility();
   bool isInteractive = displayNode->GetIntersectingSlicesInteractive() || displayNode->GetIntersectingThickSlabInteractive();
+  // TODO: curved planar reformation too?
 
   if (!(showSliceIntersectionLines || showThickSlabIntersectionLines) || isInteractive)
   {
     pipeline->SetIntersectionVisibility(false);
     pipeline->SetThickSlabVisibility(false);
+    // TODO: curved planar reformation too?
     return;
   }
 
@@ -514,6 +530,7 @@ void vtkMRMLSliceIntersectionRepresentation2D::UpdateSliceIntersectionDisplay(Sl
   {
     pipeline->SetIntersectionVisibility(false);
     pipeline->SetThickSlabVisibility(false);
+    // TODO: curved planar reformation too?
     return;
   }
 
@@ -530,6 +547,7 @@ void vtkMRMLSliceIntersectionRepresentation2D::UpdateSliceIntersectionDisplay(Sl
   {
     pipeline->SetIntersectionVisibility(false);
   }
+  // TODO: curved planar reformation too?
 
   if (showThickSlabIntersectionLines)
   {
@@ -603,6 +621,8 @@ void vtkMRMLSliceIntersectionRepresentation2D::UpdateSliceIntersectionDisplay(Sl
   {
     pipeline->SetThickSlabVisibility(false);
   }
+
+  // TODO: curved planar reformation too?
 }
 
 //----------------------------------------------------------------------

@@ -521,6 +521,8 @@ void vtkMRMLSliceLinkLogic::BroadcastSliceNodeEvent(vtkMRMLSliceNode *sliceNode)
         sNode->SetSlabReconstructionThickness(sliceNode->GetSlabReconstructionThickness());
       }
 
+      // TODO: Maybe not, but check: curved planar reformation too?
+
       // Setting the slab reconstruction mode
 
 

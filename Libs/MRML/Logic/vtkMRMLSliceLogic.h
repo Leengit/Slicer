@@ -443,6 +443,8 @@ protected:
   /// Helper to update reconstruction slab settings for a given layer.
   static void UpdateReconstructionSlab(vtkMRMLSliceLogic* sliceLogic, vtkMRMLSliceLayerLogic* sliceLayerLogic);
 
+  /// TODO: Declare helper for curved planar reformation
+
   /// Returns true if position is inside the selected layer volume.
   /// Use background flag to choose between foreground/background layer.
   bool IsEventInsideVolume(bool background, double worldPos[3]);

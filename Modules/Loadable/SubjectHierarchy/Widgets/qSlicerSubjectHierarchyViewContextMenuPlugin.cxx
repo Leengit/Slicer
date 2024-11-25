@@ -90,6 +90,8 @@ public:
   QAction* EnableSlabReconstructionAction = nullptr;
   QAction* SlabReconstructionInteractiveAction = nullptr;
 
+  // TODO: Similar for curved planar reformation
+
   vtkWeakPointer<vtkMRMLInteractionNode> InteractionNode;
   vtkWeakPointer<vtkMRMLAbstractViewNode> ViewNode;
   vtkWeakPointer<vtkMRMLLayoutNode> LayoutNode;
@@ -255,6 +257,8 @@ void qSlicerSubjectHierarchyViewContextMenuPluginPrivate::init()
   qSlicerSubjectHierarchyAbstractPlugin::setActionPosition(this->SlabReconstructionInteractiveAction, thickSlabSection, 1);
   QObject::connect(this->SlabReconstructionInteractiveAction, SIGNAL(triggered(bool)),
     q, SLOT(setSlabReconstructionInteractive(bool)));
+
+  // TODO: Something for curved planar reformation here?
 }
 
 //-----------------------------------------------------------------------------
@@ -297,6 +301,7 @@ QList<QAction*> qSlicerSubjectHierarchyViewContextMenuPlugin::viewContextMenuAct
     << d->IntersectingSlicesInteractiveAction
     << d->EnableSlabReconstructionAction
     << d->SlabReconstructionInteractiveAction;
+  // TODO: Curved planar reformation
   return actions;
 }
 
@@ -403,6 +408,7 @@ void qSlicerSubjectHierarchyViewContextMenuPlugin::showViewContextMenuActionsFor
     d->IntersectingSlicesInteractiveAction->setVisible(false);
   }
 
+  // TODO: Also handle curved planar reformation here?
   if (sliceViewNode && appLogic)
   {
     d->EnableSlabReconstructionAction->setVisible(true);
@@ -710,3 +716,6 @@ void qSlicerSubjectHierarchyViewContextMenuPlugin::setSlabReconstructionInteract
   }
   appLogic->SetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesThickSlabInteractive, interactive);
 }
+
+//---------------------------------------------------------------------------
+// TODO: set enabled or interactive for curved planar reformation here?

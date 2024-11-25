@@ -35,6 +35,7 @@ int InitializeDefaultMatrixTest();
 int SlabReconstructionEnabledTest();
 int SlabReconstructionTypeTest();
 int SlabReconstructionThicknessTest();
+// TODO: Declare tests for curved planar reformation
 
 //----------------------------------------------------------------------------
 int vtkMRMLSliceNodeTest1(int , char * [] )
@@ -54,6 +55,7 @@ int vtkMRMLSliceNodeTest1(int , char * [] )
   CHECK_EXIT_SUCCESS(SlabReconstructionEnabledTest());
   CHECK_EXIT_SUCCESS(SlabReconstructionTypeTest());
   CHECK_EXIT_SUCCESS(SlabReconstructionThicknessTest());
+  // TODO: Invoke tests for curved planar reformation
 
   return EXIT_SUCCESS;
 }
@@ -516,3 +518,5 @@ int SlabReconstructionThicknessTest()
 
   return EXIT_SUCCESS;
 }
+
+// TODO: Define tests for curved planar reformation

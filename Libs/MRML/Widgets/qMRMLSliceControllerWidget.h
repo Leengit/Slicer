@@ -236,6 +236,7 @@ public slots:
   /// Reconstruction widget
   void showSlabReconstructionWidget(bool show);
   void toggleSlabReconstructionInteractive(bool interactive);
+  /// TODO: Curved planar reformation widget
   /// Compositing
   void setCompositing(int mode);
   void setCompositingToAlphaBlend();
@@ -279,6 +280,8 @@ public slots:
   // Slab Reconstruction
   void setSlabReconstructionType(int type);
   void setSlabReconstructionThickness(double thickness);
+
+  // TODO: Curve planar reformation
 
   // Lightbox
   void setLightbox(int rows, int columns);

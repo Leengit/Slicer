@@ -85,6 +85,7 @@ class SliceAnnotations(VTKObservationMixin):
             "7-TE": {"text": "", "category": "A"},
             "8-SlabReconstructionThickness": {"text": "", "category": "A"},
             "9-SlabReconstructionType": {"text": "", "category": "A"},
+            # TODO: Do something for curved planar reformation?
         })
 
         self.scene = slicer.mrmlScene
@@ -506,6 +507,8 @@ class SliceAnnotations(VTKObservationMixin):
             else:
                 self.cornerTexts[3]["8-SlabReconstructionThickness"]["text"] = ""
                 self.cornerTexts[3]["9-SlabReconstructionType"]["text"] = ""
+
+            # TODO: Do something for curved planar reformation?
 
             if (labelVolume is not None) and self.bottomLeft:
                 labelOpacity = sliceCompositeNode.GetLabelOpacity()

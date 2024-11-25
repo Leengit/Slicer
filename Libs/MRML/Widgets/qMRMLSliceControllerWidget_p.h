@@ -92,6 +92,7 @@ public:
   void setupOrientationMarkerMenu();
   void setupRulerMenu();
   void setupSlabReconstructionMenu();
+  // TODO: Set up curved planar reformation
 
   vtkSmartPointer<vtkCollection> saveNodesForUndo(const QString& nodeTypes);
 
@@ -190,6 +191,7 @@ public:
   QMenu*                              OrientationMarkerMenu;
   QMenu*                              RulerMenu;
   QMenu*                              SlabReconstructionMenu;
+  // TODO: Declare CurvedPlanarReformationMenu member
 
   ctkDoubleSpinBox*                   SliceSpacingSpinBox;
   ctkDoubleSpinBox*                   SliceFOVSpinBox;
@@ -217,6 +219,8 @@ public:
   ctkSignalMapper*                    SlabReconstructionTypesMapper;
   QMenu*                              SlabReconstructionThicknessMenu{nullptr};
   QActionGroup*                       SlabReconstructionTypesActions{nullptr};
+
+  // TODO: Declare members for helper objects for curved planar reformation
 
   bool                                ShowSliceOffsetSlider{true};
 };

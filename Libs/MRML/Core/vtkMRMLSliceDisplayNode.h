@@ -85,6 +85,8 @@ public:
   vtkBooleanMacro(IntersectingSlicesRotationEnabled, bool);
   //@}
 
+  // TODO: Add macros for curved planar reformation
+
   enum IntersectingSlicesInteractiveMode
   {
     ModeRotation,
@@ -173,6 +175,7 @@ public:
     ComponentTranslateSingleIntersectingSliceHandle, ///< mouse is near the middle of the slice intersection (translation section)
     ComponentSliceIntersection, ///< slice intersection is active (not any handle), e.g., because user is interacting with the widget
     ComponentTranslateIntersectingThickSlabHandle, ///< mouse is near the handle for adjusting a thick slab
+    /* TODO: Add component for curved planar reformation? */
     Component_Last
   };
 
@@ -223,6 +226,7 @@ protected:
   bool IntersectingSlicesRotationEnabled{ true };
   bool IntersectingThickSlabInteractive{ false };
   bool IntersectingThickSlabVisibility{ false };
+  // TODO: Add members, with initializers, for curved planar reformation
 
   int IntersectingSlicesInteractiveHandlesVisibilityMode{ NeverVisible };
 

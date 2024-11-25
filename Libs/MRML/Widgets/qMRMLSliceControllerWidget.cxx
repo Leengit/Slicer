@@ -94,6 +94,7 @@ qMRMLSliceControllerWidgetPrivate::qMRMLSliceControllerWidgetPrivate(qMRMLSliceC
   this->OrientationMarkerMenu = nullptr;
   this->RulerMenu = nullptr;
   this->SlabReconstructionMenu = nullptr;
+  // TODO: Initialize curved planar reformation members
 
   this->SliceSpacingSpinBox = nullptr;
   this->SliceFOVSpinBox = nullptr;
@@ -240,6 +241,7 @@ void qMRMLSliceControllerWidgetPrivate::setupPopupUi()
                    q, SLOT(showSlabReconstructionWidget(bool)));
   QObject::connect(this->actionSlabReconstructionInteractive, SIGNAL(toggled(bool)),
                    q, SLOT(toggleSlabReconstructionInteractive(bool)));
+  // TODO: Connect curved planar reformation widgets
 
   this->setupLightboxMenu();
   this->setupCompositingMenu();
@@ -250,6 +252,7 @@ void qMRMLSliceControllerWidgetPrivate::setupPopupUi()
   this->setupOrientationMarkerMenu();
   this->setupRulerMenu();
   this->setupSlabReconstructionMenu();
+  // TODO: Set up curved planar reformation menu
 
   // Visibility column
   this->connect(this->actionSegmentationVisibility, SIGNAL(triggered(bool)),
@@ -342,6 +345,7 @@ void qMRMLSliceControllerWidgetPrivate::setupPopupUi()
   this->ShowReformatWidgetToolButton->setDefaultAction(this->actionShow_reformat_widget);
 
   this->EnableSlabReconstructionButton->setMenu(this->SlabReconstructionMenu);
+  // TODO: Set menu for curved planar reformation
   this->SliceCompositeButton->setMenu(this->CompositingMenu);
   this->SliceSpacingButton->setMenu(this->SliceSpacingMenu);
   this->SliceVisibilityButton->setMenu(this->SliceModelMenu);
@@ -933,6 +937,8 @@ void qMRMLSliceControllerWidgetPrivate::updateWidgetFromMRMLSliceNode()
   // Type
   this->SlabReconstructionTypesActions->setEnabled(sliceNode->GetSlabReconstructionEnabled());
 
+  // TODO: Curved planar reformation
+
   // Slice spacing mode
   this->SliceSpacingButton->setIcon(
     sliceNode->GetSliceSpacingMode() == vtkMRMLSliceNode::AutomaticSliceSpacingMode ?
@@ -1038,6 +1044,8 @@ void qMRMLSliceControllerWidgetPrivate::updateWidgetFromMRMLSliceNode()
   {
     action->setChecked(true);
   }
+
+  // TODO: Something to do for curved planar reformation?
 }
 
 // --------------------------------------------------------------------------
@@ -1143,6 +1151,7 @@ void qMRMLSliceControllerWidgetPrivate::updateWidgetFromUnitNode()
     {
       this->SlabReconstructionThicknessSpinBox->setSuffix(unitNode->GetSuffix());
     }
+    // TODO: Something to do for curved planar reformation?
   }
 }
 
@@ -1640,6 +1649,9 @@ void qMRMLSliceControllerWidgetPrivate::setupSlabReconstructionMenu()
 
   this->SlabReconstructionMenu->addActions(slabReconstructionTypesActions->actions());
 }
+
+// --------------------------------------------------------------------------
+// TODO: qMRMLSliceControllerWidgetPrivate::setupCurvedPlanarReformationMenu()
 
 // --------------------------------------------------------------------------
 void qMRMLSliceControllerWidgetPrivate::onSegmentVisibilitySelectionChanged(QStringList selectedSegmentIDs)
@@ -2424,6 +2436,7 @@ void qMRMLSliceControllerWidget::showSlabReconstructionWidget(bool show)
         {
           displayNode->SetIntersectingThickSlabVisibility(show);
           node->SetSlabReconstructionEnabled(show);
+          // TODO: Does this need something for curved planar reformation?
         }
       }
     }
@@ -2974,6 +2987,9 @@ void qMRMLSliceControllerWidget::setSlabReconstructionThickness(double thickness
   this->mrmlSliceNode()->SetSlabReconstructionThickness(thickness);
   d->SliceLogic->EndSliceNodeInteraction();
 }
+
+//---------------------------------------------------------------------------
+// TODO: qMRMLSliceControllerWidget::showCurvedPlanarReformationWidget(bool show)
 
 // --------------------------------------------------------------------------
 void qMRMLSliceControllerWidget::updateSegmentationControlsVisibility()

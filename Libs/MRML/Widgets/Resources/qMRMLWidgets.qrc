@@ -165,5 +165,6 @@
         <file>Icons/ViewMaximize.png</file>
         <file>Icons/ViewRestore.png</file>
         <file>Icons/SlabReconstruction.png</file>
+        <file>Icons/CurvedPlanarReformation.png</file>
     </qresource>
 </RCC>

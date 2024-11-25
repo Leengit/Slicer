@@ -661,6 +661,7 @@
           </property>
          </widget>
         </item>
+        <!-- TODO: Add item for curved planar reformation here, and make edits elsewhere -->
         <item>
          <widget class="QToolButton" name="SliceMoreOptionButton">
           <property name="toolTip">

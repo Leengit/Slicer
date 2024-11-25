@@ -91,6 +91,8 @@ vtkMRMLSliceIntersectionWidget::vtkMRMLSliceIntersectionWidget()
   this->CurrentThickSlabTranslationPoint_RAS[1] = 0.0;
   this->CurrentThickSlabTranslationPoint_RAS[2] = 0.0;
 
+  // TODO: curved planar reformation too?
+
   this->StartActionFOV[0] = 0.;
   this->StartActionFOV[1] = 0.;
   this->StartActionFOV[2] = 0.;
@@ -250,6 +252,7 @@ void vtkMRMLSliceIntersectionWidget::UpdateInteractionEventMapping()
   this->SetEventTranslationClickAndDrag(WidgetStateOnTranslateIntersectingThickSlabHandle, vtkCommand::LeftButtonPressEvent, vtkEvent::NoModifier,
                                         WidgetStateTranslateIntersectingThickSlabHandle,
                                         WidgetEventTranslateIntersectingThickSlabHandleStart, WidgetEventTranslateIntersectingThickSlabHandleEnd);
+  // TODO: curved planar reformation too?
   if (this->GetActionEnabled(ActionRotateSliceIntersection))
   {
     this->SetEventTranslationClickAndDrag(WidgetStateOnRotateIntersectingSlicesHandle, vtkCommand::LeftButtonPressEvent, vtkEvent::NoModifier,
@@ -283,6 +286,7 @@ void vtkMRMLSliceIntersectionWidget::CreateDefaultRepresentation()
     return;
   }
 
+  // TODO: curved planar reformation too?
   if (this->IsSliceIntersectionInteractive() || this->IsThickSlabInteractive())
   {
     vtkNew<vtkMRMLSliceIntersectionInteractionRepresentation> newRepInteraction;
@@ -355,6 +359,7 @@ bool vtkMRMLSliceIntersectionWidget::CanProcessInteractionEvent(vtkMRMLInteracti
     || this->WidgetState == WidgetStateRotateIntersectingSlicesHandle
     || this->WidgetState == WidgetStateTranslateSingleIntersectingSliceHandle
     || this->WidgetState == WidgetStateTranslateIntersectingThickSlabHandle
+    // TODO: curved planar reformation too?
     )
   {
     distance2 = 0.0;
@@ -380,6 +385,7 @@ bool vtkMRMLSliceIntersectionWidget::CanProcessInteractionEvent(vtkMRMLInteracti
       || this->WidgetState == WidgetStateRotateIntersectingSlicesHandle
       || this->WidgetState == WidgetStateTranslateSingleIntersectingSliceHandle
       || this->WidgetState == WidgetStateTranslateIntersectingThickSlabHandle)
+      // TODO: curved planar reformation too?
     {
       distance2 = 0.0;
       return true;
@@ -627,6 +633,7 @@ bool vtkMRMLSliceIntersectionWidget::ProcessInteractionEvent(vtkMRMLInteractionE
     case WidgetEventTranslateIntersectingThickSlabHandleEnd:
       processedEvent = this->ProcessEndMouseDrag(eventData);
       break;
+    // TODO: curved planar reformation too?
 
     default:
       processedEvent = false;
@@ -653,6 +660,7 @@ void vtkMRMLSliceIntersectionWidget::Leave(vtkMRMLInteractionEventData* eventDat
     || this->WidgetState == WidgetStateTranslateSingleIntersectingSliceHandle
     || this->WidgetState == WidgetStateRotateIntersectingSlicesHandle
     || this->WidgetState == WidgetStateTranslateIntersectingThickSlabHandle)
+    // TODO: curved planar reformation too?
   {
     this->ProcessEndMouseDrag(eventData);
   }
@@ -707,6 +715,7 @@ bool vtkMRMLSliceIntersectionWidget::ProcessMouseMove(vtkMRMLInteractionEventDat
     case WidgetStateOnTranslateIntersectingSlicesHandle:
     case WidgetStateOnRotateIntersectingSlicesHandle:
     case WidgetStateOnTranslateIntersectingThickSlabHandle:
+    // TODO: curved planar reformation too?
     case WidgetStateOnTranslateSingleIntersectingSliceHandle:
       if (interactiveRep)
       {
@@ -740,6 +749,7 @@ bool vtkMRMLSliceIntersectionWidget::ProcessMouseMove(vtkMRMLInteractionEventDat
         {
           this->SetWidgetState(WidgetStateOnTranslateIntersectingThickSlabHandle);
         }
+        // TODO: curved planar reformation too?
         else
         {
           this->SetWidgetState(WidgetStateOnWidget);
@@ -761,6 +771,7 @@ bool vtkMRMLSliceIntersectionWidget::ProcessMouseMove(vtkMRMLInteractionEventDat
     case WidgetStateTranslateIntersectingSlicesHandle:
     case WidgetStateTranslateSingleIntersectingSliceHandle:
     case WidgetStateTranslateIntersectingThickSlabHandle:
+    // TODO: curved planar reformation too?
     case WidgetStateRotateIntersectingSlicesHandle:
     {
       // Process the motion
@@ -805,6 +816,7 @@ bool vtkMRMLSliceIntersectionWidget::ProcessMouseMove(vtkMRMLInteractionEventDat
           this->ProcessTranslateIntersectingThickSlabHandle(eventData);
         }
       }
+      // TODO: curved planar reformation too?
       else if (this->WidgetState == WidgetStateRotateIntersectingSlicesHandle)
       {
         this->ProcessRotateIntersectingSlicesHandle(eventData);
@@ -1027,6 +1039,7 @@ void vtkMRMLSliceIntersectionWidget::SliceModifiedCallback(vtkObject* vtkNotUsed
   bool needToUpdateRepresentation = false;
 
 
+  // TODO: curved planar reformation too?
   if (self->IsSliceIntersectionInteractive() || self->IsThickSlabInteractive())
   {
     needToUpdateRepresentation = !vtkMRMLSliceIntersectionInteractionRepresentation::SafeDownCast(self->WidgetRep);
@@ -1678,6 +1691,7 @@ int vtkMRMLSliceIntersectionWidget::GetMouseCursor()
       return VTK_CURSOR_HAND;
     case WidgetStateOnTranslateIntersectingThickSlabHandle:
       return VTK_CURSOR_HAND; // TODO: Just for now
+    // TODO: curved planar reformation too?
     default:
       return VTK_CURSOR_DEFAULT;
   }
@@ -2073,3 +2087,6 @@ bool vtkMRMLSliceIntersectionWidget::IsThickSlabInteractive()
   }
   return mrmlAppLogic->GetIntersectingSlicesEnabled(vtkMRMLApplicationLogic::IntersectingSlicesThickSlabInteractive);
 }
+
+//----------------------------------------------------------------------------
+// TODO: curved planar reformation too?

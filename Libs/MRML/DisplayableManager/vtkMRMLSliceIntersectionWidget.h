@@ -100,6 +100,8 @@ public:
     WidgetStateOnTranslateIntersectingThickSlabHandle, ///< hovering over a slice thick slab translation handle
     WidgetStateTranslateIntersectingThickSlabHandle, ///< adjusting a slice thick slab thickness by drag-and-dropping handle
 
+    // TODO: curved planar reformation too?
+
     WidgetState_Last
   };
 
@@ -154,6 +156,8 @@ public:
     // WidgetStateOnTranslateIntersectingThickSlabHandle/WidgetStateTranslateIntersectingThickSlabHandle
     WidgetEventTranslateIntersectingThickSlabHandleStart,
     WidgetEventTranslateIntersectingThickSlabHandleEnd,
+
+    // TODO: curved planar reformation too?
   };
 
   /// Action State values and management
@@ -232,6 +236,7 @@ protected:
   bool ProcessRotateIntersectingSlicesHandle(vtkMRMLInteractionEventData* eventData);
   bool ProcessTranslateIntersectingThickSlabHandleStart(vtkMRMLInteractionEventData* eventData);
   bool ProcessTranslateIntersectingThickSlabHandle(vtkMRMLInteractionEventData* eventData);
+  // TODO: curved planar reformation too?
 
   bool ProcessWidgetMenu(vtkMRMLInteractionEventData* eventData);
 
@@ -278,6 +283,8 @@ protected:
   double StartThickSlabTranslationPoint_RAS[3];
   double CurrentThickSlabTranslationPoint_RAS[3];
 
+  // TODO: curved planar reformation too?
+
   double StartActionFOV[3];
   double VolumeScalarRange[2];
 
@@ -312,6 +319,7 @@ protected:
 
   bool IsSliceIntersectionInteractive();
   bool IsThickSlabInteractive();
+  // TODO: curved planar reformation too?
 
   /// Indicates whether the shift key was used during the previous action.
   /// This is used to require shift-up after a click-and-drag before accepting shift+mousemove.

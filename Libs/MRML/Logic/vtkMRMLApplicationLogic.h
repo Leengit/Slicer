@@ -260,6 +260,7 @@ public:
     IntersectingSlicesTranslation,
     IntersectingSlicesRotation,
     IntersectingSlicesThickSlabInteractive,
+    // TODO: curved planar reformation too?
   };
 
   void SetIntersectingSlicesEnabled(IntersectingSlicesOperation operation, bool enabled);

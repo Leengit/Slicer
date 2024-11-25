@@ -987,6 +987,7 @@ void vtkMRMLApplicationLogic::SetIntersectingSlicesEnabled(
         case vtkMRMLApplicationLogic::IntersectingSlicesRotation:
           sliceDisplayNode->SetIntersectingSlicesRotationEnabled(enabled);
           break;
+        // TODO: curved planar reformation too?
       }
     }
   }
@@ -1051,6 +1052,7 @@ bool vtkMRMLApplicationLogic::GetIntersectingSlicesEnabled(
       return sliceDisplayNode->GetIntersectingSlicesRotationEnabled();
     case vtkMRMLApplicationLogic::IntersectingSlicesThickSlabInteractive:
       return sliceDisplayNode->GetIntersectingThickSlabInteractive();
+    // TODO: curved planar reformation too?
   }
 
   return false;
