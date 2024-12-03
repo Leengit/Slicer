@@ -22,23 +22,27 @@
 #include <vector>
 #include <deque>
 
+class vtkMRMLCurveNode;
 class vtkMRMLDisplayNode;
 class vtkMRMLLinearTransformNode;
 class vtkMRMLModelDisplayNode;
 class vtkMRMLModelNode;
+class vtkMRMLScalarVolumeNode;
 class vtkMRMLSliceCompositeNode;
 class vtkMRMLSliceDisplayNode;
 class vtkMRMLSliceLayerLogic;
 class vtkMRMLSliceNode;
+class vtkMRMLTransformNode;
 class vtkMRMLVolumeNode;
 
 class vtkAlgorithmOutput;
 class vtkCollection;
 class vtkImageBlend;
-class vtkTransform;
 class vtkImageData;
 class vtkImageMathematics;
 class vtkImageReslice;
+class vtkMatrix4x4;
+class vtkPointsArray;
 class vtkTransform;
 
 struct SliceLayerInfo;
@@ -443,7 +447,32 @@ protected:
   /// Helper to update reconstruction slab settings for a given layer.
   static void UpdateReconstructionSlab(vtkMRMLSliceLogic* sliceLogic, vtkMRMLSliceLayerLogic* sliceLayerLogic);
 
-  /// TODO: Declare helper for curved planar reformation
+  /// Initialize CurvePlanarReformation functionality
+  void CurvedPlanarReformationInit();
+
+  /// GetPointsProjectedToPlane for curved planar reformation
+  // TODO: Is return type correct regarding memory deallocation
+  vtkPointsArray * CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArray,
+                                                                    vtkMatrix4x4 *   transformWorldToPlane);
+
+  /// ComputeStraighteningTransform for curved planar reformation
+  void CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode * transformToStraightenedNode,
+                                                            vtkMRMLCurveNode *     curveNode,
+                                                            double                 sliceSizeMm[2],
+                                                            double                 outputSpacingMm,
+                                                            bool                   stretching = false,
+                                                            double                 rotationDeg = 0.0);
+
+  /// StraightenVolume for curved planar reformation
+  void CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNode * outputStraightenedVolume,
+                                               vtkMRMLScalarVolumeNode * volumeNode,
+                                               double                    outputStraightenedVolumeSpacing[3],
+                                               vtkMRMLTransformNode *    straighteningTransformNode);
+
+  /// ProjectVolume for curved planar reformation
+  bool CurvedPlanarReformationProjectVolume(vtkMRMLScalarVolumeNode * outputProjectedVolume,
+                                            vtkMRMLScalarVolumeNode * inputStraightenedVolume,
+                                            int                       projectionAxisIndex = 0);
 
   /// Returns true if position is inside the selected layer volume.
   /// Use background flag to choose between foreground/background layer.
@@ -474,6 +503,8 @@ protected:
   vtkMRMLModelDisplayNode*      SliceModelDisplayNode;
   vtkMRMLLinearTransformNode*   SliceModelTransformNode;
   double                        SliceSpacing[3];
+
+  double CurvedPlanarReformationTransformSpacingFactor;
 
 private:
 
