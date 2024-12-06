@@ -249,6 +249,8 @@ vtkMRMLSliceLogic::vtkMRMLSliceLogic()
   this->ImageDataConnection = nullptr;
   this->SliceSpacing[0] = this->SliceSpacing[1] = this->SliceSpacing[2] = 1;
   this->AddingSliceModelNodes = false;
+
+  this->CurvedPlanarReformationInit();
 }
 
 //----------------------------------------------------------------------------
@@ -1035,7 +1037,6 @@ void vtkMRMLSliceLogic::UpdateReconstructionSlab(vtkMRMLSliceLogic* sliceLogic, 
 void
 vtkMRMLSliceLogic::CurvedPlanarReformationInit()
 {
-  // TODO: Call CurvedPlanarReformationInit from vtkMRMLSliceLogic::vtkMRMLSliceLogic.
   // there is no need to compute displacement for each slice, we just compute for every n-th to make computation faster
   // and inverse computation more robust (less contradiction because of there is less overlapping between neighbor
   // slices)
@@ -1043,34 +1044,35 @@ vtkMRMLSliceLogic::CurvedPlanarReformationInit()
 }
 
 //----------------------------------------------------------------------------
-vtkPointsArray *
-vtkMRMLSliceLogic::CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArray,
-                                                                    vtkMatrix4x4 *   transformWorldToPlane)
+void
+vtkMRMLSliceLogic::CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArrayIn,
+                                                                    vtkMatrix4x4 *   transformWorldToPlane,
+                                                                    vtkPointsArray * pointsArrayOut)
 {
-  // TODO: Write me
-
-  // """
   // Returns points projected to the plane coordinate system (plane normal = plane Z axis).
-  // pointsArray contains each point as a column vector.
-  // """
-  // import numpy as np
 
-  // numberOfPoints = pointsArray.shape[1]
-  // # Concatenate a 4th line containing 1s so that we can transform the positions using
-  // # a single matrix multiplication.
-  // pointsArray_World = np.row_stack((pointsArray, np.ones(numberOfPoints)))
+  // Compute the inverse transformation
+  vtkSmartPointer<vtkMatrix4x4> transformPlaneToWorld = vtkSmartPointer<vtkMatrix4x4>::New();
+  vtkMatrix4x4::Invert(transformWorldToPlane, transformPlaneToWorld);
 
-  // # Point positions in the plane coordinate system:
-  // pointsArray_Plane = np.dot(transformWorldToPlane, pointsArray_World)
-  // # Projected point positions in the plane coordinate system:
-  // pointsArray_Plane[2, :] = np.zeros(numberOfPoints)
-  // # Projected point positions in the world coordinate system:
-  // pointsArrayProjected_World = np.dot(np.linalg.inv(transformWorldToPlane), pointsArray_Plane)
+  const vtkIdType numPoints = pointsArrayIn->GetNumberOfPoints();
+  double          pIn[4] = { 0.0, 0.0, 0.0, 1.0 };
+  double          pMiddle[4] = { 0.0, 0.0, 0.0, 1.0 };
+  double          pOut[4] = { 0.0, 0.0, 0.0, 1.0 };
 
-  // # remove the last row (all ones)
-  // pointsArrayProjected_World = pointsArrayProjected_World[0:3, :]
+  for (vtkIdType i = 0; i < numPoints; ++i)
+  {
+    // Note: uses only the first three elements of pIn
+    pointsArrayIn->GetPoint(i, (double *)pIn);
+    // Point positions in the plane coordinate system:
+    transformWorldToPlane->MultiplyPoint(pIn, pMiddle);
+    // Projected point positions in the plane coordinate system:
+    pMiddle[2] = 0.0;
+    // Projected point positions in the world coordinate system:
+    transformPlaneToWorld->MultiplyPoint(pMiddle, pOut);
+    pointsArrayOut->SetPoint(i, pOut[0], pOut[1], pOut[2])
+  }
 
-  // return pointsArrayProjected_World
   return nullptr;
 }
 

@@ -451,9 +451,9 @@ protected:
   void CurvedPlanarReformationInit();
 
   /// GetPointsProjectedToPlane for curved planar reformation
-  // TODO: Is return type correct regarding memory deallocation
-  vtkPointsArray * CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArray,
-                                                                    vtkMatrix4x4 *   transformWorldToPlane);
+  void CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArrayIn,
+                                                        vtkMatrix4x4 *   transformWorldToPlane,
+                                                        vtkPointsArray * pointsArrayOut);
 
   /// ComputeStraighteningTransform for curved planar reformation
   void CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode * transformToStraightenedNode,
@@ -504,7 +504,7 @@ protected:
   vtkMRMLLinearTransformNode*   SliceModelTransformNode;
   double                        SliceSpacing[3];
 
-  double CurvedPlanarReformationTransformSpacingFactor;
+  double                        CurvedPlanarReformationTransformSpacingFactor;
 
 private:
 
