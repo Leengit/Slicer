@@ -22,9 +22,9 @@
 #include <vector>
 #include <deque>
 
-class vtkMRMLCurveNode;
 class vtkMRMLDisplayNode;
 class vtkMRMLLinearTransformNode;
+class vtkMRMLMarkupsCurveNode;
 class vtkMRMLModelDisplayNode;
 class vtkMRMLModelNode;
 class vtkMRMLScalarVolumeNode;
@@ -38,12 +38,10 @@ class vtkMRMLVolumeNode;
 class vtkAlgorithmOutput;
 class vtkCollection;
 class vtkImageBlend;
-class vtkImageData;
 class vtkImageMathematics;
 class vtkImageReslice;
 class vtkMatrix4x4;
-class vtkPointsArray;
-class vtkTransform;
+class vtkPoints;
 
 struct SliceLayerInfo;
 struct BlendPipeline;
@@ -451,22 +449,23 @@ protected:
   void CurvedPlanarReformationInit();
 
   /// GetPointsProjectedToPlane for curved planar reformation
-  void CurvedPlanarReformationGetPointsProjectedToPlane(vtkPointsArray * pointsArrayIn,
-                                                        vtkMatrix4x4 *   transformWorldToPlane,
-                                                        vtkPointsArray * pointsArrayOut);
+  void CurvedPlanarReformationGetPointsProjectedToPlane(vtkPoints *    pointsArrayIn,
+                                                        vtkMatrix4x4 * transformWorldToPlane,
+                                                        vtkPoints *    pointsArrayOut);
 
   /// ComputeStraighteningTransform for curved planar reformation
-  void CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode * transformToStraightenedNode,
-                                                            vtkMRMLCurveNode *     curveNode,
-                                                            double                 sliceSizeMm[2],
-                                                            double                 outputSpacingMm,
-                                                            bool                   stretching = false,
-                                                            double                 rotationDeg = 0.0);
+  void CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode *    transformToStraightenedNode,
+                                                            vtkMRMLMarkupsCurveNode * curveNode,
+                                                            const double              sliceSizeMm[2],
+                                                            double                    outputSpacingMm,
+                                                            bool                      stretching = false,
+                                                            double                    rotationDeg = 0.0,
+                                                            vtkMRMLModelNode *        reslicingPlanesModelNode = nullptr);
 
   /// StraightenVolume for curved planar reformation
-  void CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNode * outputStraightenedVolume,
+  bool CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNode * outputStraightenedVolume,
                                                vtkMRMLScalarVolumeNode * volumeNode,
-                                               double                    outputStraightenedVolumeSpacing[3],
+                                               const double              outputStraightenedVolumeSpacing[3],
                                                vtkMRMLTransformNode *    straighteningTransformNode);
 
   /// ProjectVolume for curved planar reformation
