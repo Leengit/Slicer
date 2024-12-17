@@ -24,7 +24,7 @@
 
 class vtkMRMLDisplayNode;
 class vtkMRMLLinearTransformNode;
-class vtkMRMLMarkupsCurveNode;
+class vtkMRMLMarkupsCurveNode;  //TODO: Not available
 class vtkMRMLModelDisplayNode;
 class vtkMRMLModelNode;
 class vtkMRMLScalarVolumeNode;
