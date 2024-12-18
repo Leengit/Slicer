@@ -1498,24 +1498,35 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
 
   vtkMRMLApplicationLogic * appLogic = this->GetMRMLApplicationLogic();
   std::string               resampleScalarVectorDWIVolumeString = "ResampleScalarVectorDWIVolume";
-  if (appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolumeString))
-  {
-    vtkMRMLScalarVolumeNode * inputVolume = volumeNode;
-    vtkMRMLScalarVolumeNode * outputVolume = outputStraightenedVolume;
-    vtkMRMLTransformNode *    resamplingTransform = straighteningTransformNode;
-    std::string               interpolationType = (volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? "nn" : "bs");
-    vtkMRMLScalarVolumeNode * referenceVolume = outputStraightenedVolume;
-    vtkMRMLAbstractVolumeResampler::ResamplingParameters resamplingParameters;
-    bool success = appLogic->ResampleVolume(resampleScalarVectorDWIVolumeString,
-                                            inputVolume,
-                                            outputVolume,
-                                            resamplingTransform,
-                                            resamplingParameters,
-                                            referenceVolume);
-  }
-  else
+  bool                      found = appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolumeString);
+  if (!found)
   {
     std::cerr << "Failed to get CLI logic for module: " << resampleScalarVectorDWIVolumeString << std::endl;
+    return false; // TODO: Or some other response?
+  }
+
+  std::string            resamplerName = resampleScalarVectorDWIVolumeString;
+  vtkMRMLVolumeNode *    inputVolume = volumeNode;
+  vtkMRMLVolumeNode *    outputVolume = outputStraightenedVolume;
+  vtkMRMLTransformNode * resamplingTransform = straighteningTransformNode;
+  vtkMRMLVolumeNode *    referenceVolume = outputStraightenedVolume;
+  int interpolationType =
+    (volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? vtkMRMLAbstractVolumeResampler::InterpolationTypeNearestNeighbor
+                                                  : vtkMRMLAbstractVolumeResampler::InterpolationTypeBSpline);
+  int windowedSincFunction = vtkMRMLAbstractVolumeResampler::WindowedSincFunctionCosine;
+  const vtkMRMLAbstractVolumeResampler::ResamplingParameters resamplingParameters;
+
+  bool success = appLogic->ResampleVolume(resamplerName,
+                                          inputVolume,
+                                          outputVolume,
+                                          resamplingTransform,
+                                          referenceVolume,
+                                          interpolationType,
+                                          windowedSincFunction,
+                                          resamplingParameters);
+  if (!success)
+  {
+    std::cerr << "CLI logic for module " << resampleScalarVectorDWIVolumeString << " failed to run" << std::endl;
     return false; // TODO: Or some other response?
   }
 
