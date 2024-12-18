@@ -1472,36 +1472,52 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
   outputStraightenedVolume->SetIJKToRASMatrix(straightenedVolumeIJKToRASMatrix);
 
   // Resample input volume to straightened volume
-  vtkMRMLApplicationLogic *                       appLogic = this->GetMRMLApplicationLogic();
-  std::string                                     resampleScalarVectorDWIVolume = "ResampleScalarVectorDWIVolume";
-  vtkSmartPointer<vtkMRMLAbstractVolumeResampler> abstractResampler;
-  if (!appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolume))
+  /*
+  vtkSmartPointer<vtkMRMLCommandLineModuleNode> parameterNode = vtkSmartPointer<vtkMRMLCommandLineModuleNode>::New();
+  this->GetMRMLScene()->AddNode(parameterNode); // TODO: Is some like this appropriate?
+  parameterNode->SetParameterAsString("inputVolume", volumeNode->GetID());
+  parameterNode->SetParameterAsString("outputVolume", outputStraightenedVolume->GetID());
+  parameterNode->SetParameterAsString("referenceVolume", outputStraightenedVolume->GetID());
+  parameterNode->SetParameterAsString("transformationFile", straighteningTransformNode->GetID());
+  // Use nearest neighbor interpolation for label volumes (to avoid incorrect labels at boundaries) and higher-order
+  // (bspline) interpolation for scalar volumes.
+  parameterNode->SetParameterAsString("interpolationType", volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? "nn" : "bs");
+  // resamplerModule = slicer.modules.resamplescalarvectordwivolume
+  // module = app.moduleManager().module(moduleName)
+  // logic = getModuleGui(module).logic
+  // logic = module.logic()
+  vtkSlicerCLIModuleLogic * resamplerModule = vtkSlicerCLIModuleLogic::SafeDownCast(
+    this->GetMRMLApplicationLogic()->GetModuleLogic("ResampleScalarVectorDWIVolume"));
+  if (!resamplerModule)
   {
-    abstractResampler = vtkSmartPointer<vtkMRMLAbstractVolumeResampler>::New();  // TODO: This fails.  Bug or should we do this another way?
-    appLogic->RegisterVolumeResampler(resampleScalarVectorDWIVolume, abstractResampler);
-    if (!appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolume))
-    {
-      std::cerr << "Failed to get CLI logic for module: " << resampleScalarVectorDWIVolume << std::endl;
-      return false; // TODO: Or some other response?
-    }
+    std::cerr << "Failed to get CLI logic for module: ResampleScalarVectorDWIVolume" << std::endl;
+    return false; // TODO: Instead throw or similar?
   }
-  vtkMRMLScalarVolumeNode * inputVolume = volumeNode;
-  vtkMRMLScalarVolumeNode * outputVolume = outputStraightenedVolume;
-  vtkMRMLTransformNode *    resamplingTransform = straighteningTransformNode;
-  std::string               interpolationType = (volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? "nn" : "bs");
-  vtkMRMLScalarVolumeNode * referenceVolume = outputStraightenedVolume;
-  vtkMRMLAbstractVolumeResampler::ResamplingParameters resamplingParameters;
-  resamplingParameters["inputVolume"] = inputVolume->GetID();
-  resamplingParameters["outputVolume"] = outputVolume->GetID();
-  resamplingParameters["referenceVolume"] = referenceVolume->GetID();
-  resamplingParameters["transformationFile"] = resamplingTransform->GetID();
-  resamplingParameters["interpolationType"] = interpolationType;
-  bool success = appLogic->ResampleVolume(resampleScalarVectorDWIVolume,
-                                          inputVolume,
-                                          outputVolume,
-                                          resamplingTransform,
-                                          resamplingParameters,
-                                          referenceVolume);
+  resamplerModule->ApplyAndWait(parameterNode); // TODO: Is this right?
+  */
+
+  vtkMRMLApplicationLogic * appLogic = this->GetMRMLApplicationLogic();
+  std::string               resampleScalarVectorDWIVolumeString = "ResampleScalarVectorDWIVolume";
+  if (appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolumeString))
+  {
+    vtkMRMLScalarVolumeNode * inputVolume = volumeNode;
+    vtkMRMLScalarVolumeNode * outputVolume = outputStraightenedVolume;
+    vtkMRMLTransformNode *    resamplingTransform = straighteningTransformNode;
+    std::string               interpolationType = (volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? "nn" : "bs");
+    vtkMRMLScalarVolumeNode * referenceVolume = outputStraightenedVolume;
+    vtkMRMLAbstractVolumeResampler::ResamplingParameters resamplingParameters;
+    bool success = appLogic->ResampleVolume(resampleScalarVectorDWIVolumeString,
+                                            inputVolume,
+                                            outputVolume,
+                                            resamplingTransform,
+                                            resamplingParameters,
+                                            referenceVolume);
+  }
+  else
+  {
+    std::cerr << "Failed to get CLI logic for module: " << resampleScalarVectorDWIVolumeString << std::endl;
+    return false; // TODO: Or some other response?
+  }
 
   outputStraightenedVolume->CreateDefaultDisplayNodes();
   vtkMRMLDisplayNode * volumeDisplayNode = volumeNode->GetDisplayNode();
