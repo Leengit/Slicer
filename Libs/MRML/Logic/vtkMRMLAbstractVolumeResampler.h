@@ -38,14 +38,36 @@ public:
   vtkTypeMacro(vtkMRMLAbstractVolumeResampler, vtkObject);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
+  enum
+  {
+    InterpolationTypeUndefined,
+    InterpolationTypeNearestNeighbor,
+    InterpolationTypeLinear,
+    InterpolationTypeWindowedSinc,
+    InterpolationTypeBSpline,
+    InterpolationType_Last // must be last
+  };
+
+  enum
+  {
+    WindowedSincFunctionUndefined,
+    WindowedSincFunctionHamming,
+    WindowedSincFunctionCosine,
+    WindowedSincFunctionWelch,
+    WindowedSincFunctionLanczos,
+    WindowedSincFunctionBlackman,
+    WindowedSincFunction_Last // must be last
+  };
+
   typedef std::map<std::string, std::string> ResamplingParameters;
 
   virtual bool Resample(vtkMRMLVolumeNode* inputVolume,
                         vtkMRMLVolumeNode* outputVolume,
-                        const ResamplingParameters& resamplingParameter,
                         vtkMRMLTransformNode* resamplingTransform,
-                        vtkMRMLVectorVolumeNode* deformationFieldVolume,
-                        vtkMRMLVolumeNode* referenceVolume) = 0;
+                        vtkMRMLVolumeNode* referenceVolume,
+                        int interpolationType,
+                        int windowedSincFunction,
+                        const ResamplingParameters& resamplingParameter) = 0;
 
   /// @{
   /// Get resampling parameter value

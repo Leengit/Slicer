@@ -1318,8 +1318,10 @@ bool vtkMRMLApplicationLogic::ResampleVolume(std::string& resamplerName,
                                              vtkMRMLVolumeNode* inputVolume,
                                              vtkMRMLVolumeNode* outputVolume,
                                              vtkMRMLTransformNode* resamplingTransform,
-                                             const vtkMRMLAbstractVolumeResampler::ResamplingParameters& resamplingParameters,
-                                             vtkMRMLVolumeNode* referenceVolume)
+                                             vtkMRMLVolumeNode* referenceVolume,
+                                             int interpolationType,
+                                             int windowedSincFunction,
+                                             const vtkMRMLAbstractVolumeResampler::ResamplingParameters& resamplingParameters)
 {
   vtkMRMLAbstractVolumeResampler* resampler = this->GetVolumeResampler(resamplerName);
   if (!resampler)
@@ -1327,22 +1329,12 @@ bool vtkMRMLApplicationLogic::ResampleVolume(std::string& resamplerName,
     vtkErrorMacro("ResampleVolume: resampler not registered " << resamplerName);
     return false;
   }
-  return resampler->Resample(inputVolume, outputVolume, resamplingParameters, resamplingTransform, /* deformationFieldVolume= */ nullptr, referenceVolume);
-}
-
-//----------------------------------------------------------------------------
-bool vtkMRMLApplicationLogic::ResampleVolume(std::string& resamplerName,
-                                             vtkMRMLVolumeNode* inputVolume,
-                                             vtkMRMLVolumeNode* outputVolume,
-                                             vtkMRMLVectorVolumeNode* deformationFieldVolume,
-                                             const vtkMRMLAbstractVolumeResampler::ResamplingParameters& resamplingParameters,
-                                             vtkMRMLVolumeNode* referenceVolume)
-{
-  vtkMRMLAbstractVolumeResampler* resampler = this->GetVolumeResampler(resamplerName);
-  if (!resampler)
-  {
-    vtkErrorMacro("ResampleVolume: resampler not registered " << resamplerName);
-    return false;
-  }
-  return resampler->Resample(inputVolume, outputVolume, resamplingParameters, /* resamplingTransform= */ nullptr, deformationFieldVolume, referenceVolume);
+  return resampler->Resample(
+        inputVolume,
+        outputVolume,
+        resamplingTransform,
+        referenceVolume,
+        interpolationType,
+        windowedSincFunction,
+        resamplingParameters);
 }

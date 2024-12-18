@@ -309,18 +309,11 @@ public:
                       vtkMRMLVolumeNode* inputVolume,
                       vtkMRMLVolumeNode* outputVolume,
                       vtkMRMLTransformNode* resamplingTransform,
-                      const vtkMRMLAbstractVolumeResampler::ResamplingParameters& resamplingParameters,
-                      vtkMRMLVolumeNode* referenceVolume = nullptr);
-
-  /// Resample volume using the registered resampler.
-  /// \sa RegisterVolumeResampler()
-  /// \sa GetVolumeResampler()
-  bool ResampleVolume(std::string& resamplerName,
-                      vtkMRMLVolumeNode* inputVolume,
-                      vtkMRMLVolumeNode* outputVolume,
-                      vtkMRMLVectorVolumeNode* deformationFieldVolume,
-                      const vtkMRMLAbstractVolumeResampler::ResamplingParameters& resamplingParameters,
-                      vtkMRMLVolumeNode* referenceVolume = nullptr);
+                      vtkMRMLVolumeNode* referenceVolume = nullptr,
+                      int interpolationType = vtkMRMLAbstractVolumeResampler::InterpolationTypeLinear,
+                      int windowedSincFunction = vtkMRMLAbstractVolumeResampler::WindowedSincFunctionCosine,
+                      const vtkMRMLAbstractVolumeResampler::ResamplingParameters & resamplingParameters =
+                        vtkMRMLAbstractVolumeResampler::ResamplingParameters());
 
 protected:
 
