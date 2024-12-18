@@ -24,7 +24,7 @@
 
 class vtkMRMLDisplayNode;
 class vtkMRMLLinearTransformNode;
-class vtkMRMLMarkupsCurveNode;  //TODO: Not available
+class vtkMRMLMarkupsCurveNode;
 class vtkMRMLModelDisplayNode;
 class vtkMRMLModelNode;
 class vtkMRMLScalarVolumeNode;
@@ -454,7 +454,7 @@ protected:
                                                         vtkPoints *    pointsArrayOut);
 
   /// ComputeStraighteningTransform for curved planar reformation
-  void CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode *    transformToStraightenedNode,
+  bool CurvedPlanarReformationComputeStraighteningTransform(vtkMRMLTransformNode *    transformToStraightenedNode,
                                                             vtkMRMLMarkupsCurveNode * curveNode,
                                                             const double              sliceSizeMm[2],
                                                             double                    outputSpacingMm,

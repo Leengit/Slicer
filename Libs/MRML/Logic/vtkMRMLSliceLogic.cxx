@@ -1063,16 +1063,16 @@ vtkMRMLSliceLogic::CurvedPlanarReformationGetPointsProjectedToPlane(vtkPoints * 
   vtkMatrix4x4::Invert(transformWorldToPlane, transformPlaneToWorld);
 
   const vtkIdType numPoints = pointsArrayIn->GetNumberOfPoints();
-  double          pIn[4] = { 0.0, 0.0, 0.0, 1.0 };     // TODO: Or should this be double[3]?
-  double          pMiddle[4] = { 0.0, 0.0, 0.0, 1.0 }; // TODO: Or should this be double[3]?
-  double          pOut[4] = { 0.0, 0.0, 0.0, 1.0 };    // TODO: Or should this be double[3]?
+  double          pIn[4] = { 0.0, 0.0, 0.0, 1.0 };
+  double          pMiddle[4] = { 0.0, 0.0, 0.0, 1.0 };
+  double          pOut[4] = { 0.0, 0.0, 0.0, 1.0 };
 
   for (vtkIdType i = 0; i < numPoints; ++i)
   {
     // Note: uses only the first three elements of pIn
-    pointsArrayIn->GetPoint(i, static_cast<double *>(pIn));
+    pointsArrayIn->GetPoint(i, static_cast<double *>(pIn)); // requires double[3]
     // Point positions in the plane coordinate system:
-    transformWorldToPlane->MultiplyPoint(pIn, pMiddle); // TODO: Accepts double[3] or double[4]?
+    transformWorldToPlane->MultiplyPoint(pIn, pMiddle);
     // Projected point positions in the plane coordinate system:
     pMiddle[2] = 0.0;
     // Projected point positions in the world coordinate system:
@@ -1082,7 +1082,7 @@ vtkMRMLSliceLogic::CurvedPlanarReformationGetPointsProjectedToPlane(vtkPoints * 
 }
 
 //----------------------------------------------------------------------------
-void
+bool
 vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform(
   vtkMRMLTransformNode *    transformToStraightenedNode,
   vtkMRMLMarkupsCurveNode * curveNode,
@@ -1103,7 +1103,9 @@ vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform(
   vtkSmartPointer<vtkPoints> sampledPoints = vtkSmartPointer<vtkPoints>::New();
   if (!vtkMRMLMarkupsCurveNode::ResamplePoints(originalCurvePoints, sampledPoints, resamplingCurveSpacing, false))
   {
-    throw std::runtime_error("Resampling curve failed"); // TODO: Or some other response?
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform failed: "
+                  "Resampling curve failed");
+    return false;
   }
   vtkMRMLMarkupsCurveNode * resampledCurveNode = vtkMRMLMarkupsCurveNode::SafeDownCast(
     this->GetMRMLScene()->AddNewNodeByClass("vtkMRMLMarkupsCurveNode", "CurvedPlanarReformat_resampled_curve_temp"));
@@ -1243,7 +1245,9 @@ vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform(
     sampledPoints->Reset();
     if (!vtkMRMLMarkupsCurveNode::ResamplePoints(originalCurvePoints, sampledPoints, resamplingCurveSpacing, false))
     {
-      throw std::runtime_error("Resampling curve failed"); // TODO: Or some other response?
+      vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform failed: "
+                    "second call to resampling curve failed");
+      return false;
     }
     for (int i = resampledCurveNode->GetNumberOfControlPoints() - 1; i >= 0; --i)
     {
@@ -1402,6 +1406,7 @@ vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform(
     }
     reslicingPlanesModelNode->SetAndObservePolyData(appender->GetOutput());
   }
+  return true;
 }
 
 //----------------------------------------------------------------------------
@@ -1415,16 +1420,17 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
 
   if (!outputStraightenedVolume || !volumeNode || !straighteningTransformNode)
   {
-    std::cerr << "Invalid input parameters." << std::endl;
-    return false; // TODO: Or some other response?
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume failed: invalid input parameters");
+    return false;
   }
 
   vtkOrientedGridTransform * gridTransform = vtkOrientedGridTransform::SafeDownCast(
     straighteningTransformNode->GetTransformFromParentAs("vtkOrientedGridTransform"));
   if (!gridTransform)
   {
-    std::cerr << "Straightening transform must contain a vtkOrientedGridTransform from parent" << std::endl;
-    return false; // TODO: Or some other response?
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume failed: straightening transform must "
+                  "contain a vtkOrientedGridTransform from parent");
+    return false;
   }
 
   // Get transformation grid geometry
@@ -1472,37 +1478,15 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
   outputStraightenedVolume->SetIJKToRASMatrix(straightenedVolumeIJKToRASMatrix);
 
   // Resample input volume to straightened volume
-  /*
-  vtkSmartPointer<vtkMRMLCommandLineModuleNode> parameterNode = vtkSmartPointer<vtkMRMLCommandLineModuleNode>::New();
-  this->GetMRMLScene()->AddNode(parameterNode); // TODO: Is some like this appropriate?
-  parameterNode->SetParameterAsString("inputVolume", volumeNode->GetID());
-  parameterNode->SetParameterAsString("outputVolume", outputStraightenedVolume->GetID());
-  parameterNode->SetParameterAsString("referenceVolume", outputStraightenedVolume->GetID());
-  parameterNode->SetParameterAsString("transformationFile", straighteningTransformNode->GetID());
-  // Use nearest neighbor interpolation for label volumes (to avoid incorrect labels at boundaries) and higher-order
-  // (bspline) interpolation for scalar volumes.
-  parameterNode->SetParameterAsString("interpolationType", volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? "nn" : "bs");
-  // resamplerModule = slicer.modules.resamplescalarvectordwivolume
-  // module = app.moduleManager().module(moduleName)
-  // logic = getModuleGui(module).logic
-  // logic = module.logic()
-  vtkSlicerCLIModuleLogic * resamplerModule = vtkSlicerCLIModuleLogic::SafeDownCast(
-    this->GetMRMLApplicationLogic()->GetModuleLogic("ResampleScalarVectorDWIVolume"));
-  if (!resamplerModule)
-  {
-    std::cerr << "Failed to get CLI logic for module: ResampleScalarVectorDWIVolume" << std::endl;
-    return false; // TODO: Instead throw or similar?
-  }
-  resamplerModule->ApplyAndWait(parameterNode); // TODO: Is this right?
-  */
-
   vtkMRMLApplicationLogic * appLogic = this->GetMRMLApplicationLogic();
   std::string               resampleScalarVectorDWIVolumeString = "ResampleScalarVectorDWIVolume";
   bool                      found = appLogic->IsVolumeResamplerRegistered(resampleScalarVectorDWIVolumeString);
   if (!found)
   {
-    std::cerr << "Failed to get CLI logic for module: " << resampleScalarVectorDWIVolumeString << std::endl;
-    return false; // TODO: Or some other response?
+    vtkErrorMacro(
+      "vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume failed: failed to get CLI logic for module: "
+      << resampleScalarVectorDWIVolumeString);
+    return false;
   }
 
   std::string            resamplerName = resampleScalarVectorDWIVolumeString;
@@ -1510,7 +1494,7 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
   vtkMRMLVolumeNode *    outputVolume = outputStraightenedVolume;
   vtkMRMLTransformNode * resamplingTransform = straighteningTransformNode;
   vtkMRMLVolumeNode *    referenceVolume = outputStraightenedVolume;
-  int interpolationType =
+  int                    interpolationType =
     (volumeNode->IsA("vtkMRMLLabelMapVolumeNode") ? vtkMRMLAbstractVolumeResampler::InterpolationTypeNearestNeighbor
                                                   : vtkMRMLAbstractVolumeResampler::InterpolationTypeBSpline);
   int windowedSincFunction = vtkMRMLAbstractVolumeResampler::WindowedSincFunctionCosine;
@@ -1526,8 +1510,9 @@ vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume(vtkMRMLScalarVolumeNo
                                           resamplingParameters);
   if (!success)
   {
-    std::cerr << "CLI logic for module " << resampleScalarVectorDWIVolumeString << " failed to run" << std::endl;
-    return false; // TODO: Or some other response?
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationStraightenVolume failed: CLI logic for module "
+                  << resampleScalarVectorDWIVolumeString << " failed to run");
+    return false;
   }
 
   outputStraightenedVolume->CreateDefaultDisplayNodes();
@@ -1549,7 +1534,8 @@ vtkMRMLSliceLogic::CurvedPlanarReformationProjectVolume(vtkMRMLScalarVolumeNode 
 
   if ((projectionAxisIndex < 0) || (projectionAxisIndex >= 3))
   {
-    return false; // TODO: Or some other response?
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationProjectVolume failed: invalid input parameters");
+    return false;
   }
 
   // Create a new vtkImageData for the projected volume
@@ -1560,7 +1546,9 @@ vtkMRMLSliceLogic::CurvedPlanarReformationProjectVolume(vtkMRMLScalarVolumeNode 
   vtkImageData * straightenedImageData = inputStraightenedVolume->GetImageData();
   if (!straightenedImageData)
   {
-    return false; // TODO: Or some other response?
+    vtkErrorMacro(
+      "vtkMRMLSliceLogic::CurvedPlanarReformationProjectVolume failed: input straightened volume must have image data");
+    return false;
   }
 
   // Get the dimensions of the straightened volume
@@ -2354,7 +2342,7 @@ void vtkMRMLSliceLogic::FitSliceToVolume(vtkMRMLVolumeNode *volumeNode, int widt
   this->SliceNode->SetSliceOrigin(0,0,0);
   //sliceNode->SetSliceOffset(offset);
 
-  //TODO Fit UVW space
+  // TODO: Fit UVW space
   this->SnapSliceOffsetToIJK();
   this->SliceNode->UpdateMatrices( );
 }
@@ -2470,7 +2458,7 @@ void vtkMRMLSliceLogic::FitSliceToVolumes(vtkCollection *volumeNodes, int width,
   this->SliceNode->SetSliceOrigin(0,0,0);
   //sliceNode->SetSliceOffset(offset);
 
-  //TODO Fit UVW space
+  // TODO: Fit UVW space
   this->SnapSliceOffsetToIJK();
   this->SliceNode->UpdateMatrices();
 }
