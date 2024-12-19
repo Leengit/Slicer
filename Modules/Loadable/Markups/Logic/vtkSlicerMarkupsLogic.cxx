@@ -25,19 +25,15 @@
 #include "vtkMRMLMarkupsClosedCurveNode.h"
 #include "vtkMRMLMarkupsCurveNode.h"
 #include "vtkMRMLMarkupsDisplayNode.h"
-#include "vtkMRMLMarkupsFiducialDisplayNode.h"
 #include "vtkMRMLMarkupsFiducialNode.h"
 #include "vtkMRMLMarkupsFiducialStorageNode.h"
 #include "vtkMRMLMarkupsJsonStorageNode.h"
 #include "vtkMRMLMarkupsLineNode.h"
 #include "vtkMRMLMarkupsNode.h"
-#include "vtkMRMLMarkupsPlaneDisplayNode.h"
 #include "vtkMRMLMarkupsPlaneJsonStorageNode.h"
 #include "vtkMRMLMarkupsPlaneNode.h"
-#include "vtkMRMLMarkupsROIDisplayNode.h"
 #include "vtkMRMLMarkupsROIJsonStorageNode.h"
 #include "vtkMRMLMarkupsROINode.h"
-#include "vtkMRMLMarkupsStorageNode.h"
 #include "vtkMRMLTableStorageNode.h"
 
 // Markups vtk widgets includes
@@ -66,24 +62,14 @@
 #include "vtkMRMLMessageCollection.h"
 #include "vtkMRMLScene.h"
 #include "vtkMRMLSelectionNode.h"
-#include "vtkMRMLSliceCompositeNode.h"
 #include "vtkMRMLSliceNode.h"
 #include "vtkMRMLSceneViewNode.h"
 #include <vtkMRMLSubjectHierarchyNode.h>
 #include "vtkMRMLTableNode.h"
 
 // Annotation/MRML includes for legacy annotation file loading
-#include "vtkMRMLAnnotationRulerNode.h"
 #include "vtkMRMLAnnotationRulerStorageNode.h"
-#include "vtkMRMLAnnotationTextDisplayNode.h"
-#include "vtkMRMLAnnotationLineDisplayNode.h"
-#include "vtkMRMLAnnotationFiducialNode.h"
 #include "vtkMRMLAnnotationFiducialsStorageNode.h"
-#include "vtkMRMLAnnotationHierarchyNode.h"
-#include "vtkMRMLAnnotationPointDisplayNode.h"
-#include "vtkMRMLAnnotationROINode.h"
-#include "vtkMRMLAnnotationSnapshotNode.h"
-#include "vtkMRMLAnnotationSnapshotStorageNode.h"
 #include "vtkMRMLAnnotationLinesStorageNode.h"
 
 // vtkAddon includes
@@ -91,9 +77,7 @@
 
 // VTK includes
 #include <vtkBitArray.h>
-#include <vtkFloatArray.h>
 #include <vtkNew.h>
-#include <vtkObjectFactory.h>
 #include <vtkTable.h>
 
 // STD includes
@@ -406,8 +390,6 @@ void vtkSlicerMarkupsLogic::RegisterNodes()
   }
 
   // Generic markups nodes
-  scene->RegisterAbstractNodeClass("vtkMRMLMarkupsNode", "Markup");
-  scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsDisplayNode>::New());
   scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsJsonStorageNode>::New());
 
   // NOTE: the order of registration determines the order of the create push buttons in the GUI
@@ -415,8 +397,6 @@ void vtkSlicerMarkupsLogic::RegisterNodes()
   vtkNew<vtkMRMLMarkupsFiducialNode> fiducialNode;
   vtkNew<vtkSlicerPointsWidget> pointsWidget;
   this->RegisterMarkupsNode(fiducialNode, pointsWidget);
-  scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsFiducialDisplayNode>::New());
-  scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsFiducialStorageNode>::New());
 
   vtkNew<vtkMRMLMarkupsLineNode> lineNode;
   vtkNew<vtkSlicerLineWidget> lineWidget;
@@ -437,13 +417,11 @@ void vtkSlicerMarkupsLogic::RegisterNodes()
   vtkNew<vtkMRMLMarkupsPlaneNode> planeNode;
   vtkNew<vtkSlicerPlaneWidget> planeWidget;
   this->RegisterMarkupsNode(planeNode, planeWidget);
-  scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsPlaneDisplayNode>::New());
   scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsPlaneJsonStorageNode>::New());
 
   vtkNew<vtkMRMLMarkupsROINode> roiNode;
   vtkNew<vtkSlicerROIWidget> roiWidget;
   this->RegisterMarkupsNode(roiNode, roiWidget);
-  scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsROIDisplayNode>::New());
   scene->RegisterNodeClass(vtkSmartPointer<vtkMRMLMarkupsROIJsonStorageNode>::New());
 }
 
