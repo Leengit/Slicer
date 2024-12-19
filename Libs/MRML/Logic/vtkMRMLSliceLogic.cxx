@@ -14,9 +14,6 @@
 
 #if 0
 // Includes that are not available
-#include <vtkMRMLCommandLineModuleNode.h>
-#include <vtkMRMLMarkupsCurveNode.h>
-#include <vtkSlicerCLIModuleLogic.h>
 #include <vtkSlicerMarkupsLogic.h>
 #endif
 
@@ -31,6 +28,7 @@
 #include <vtkMRMLGlyphableVolumeDisplayNode.h>
 #include <vtkMRMLGlyphableVolumeSliceDisplayNode.h>
 #include <vtkMRMLLinearTransformNode.h>
+#include <vtkMRMLMarkupsCurveNode.h>
 #include <vtkMRMLModelNode.h>
 #include <vtkMRMLScalarVolumeDisplayNode.h>
 #include <vtkMRMLScene.h>
