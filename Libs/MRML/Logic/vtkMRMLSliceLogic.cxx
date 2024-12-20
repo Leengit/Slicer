@@ -12,11 +12,6 @@
 
 =========================================================================auto=*/
 
-#if 0
-// Includes that are not available
-#include <vtkSlicerMarkupsLogic.h>
-#endif
-
 // MRMLLogic includes
 #include <vtkMRMLApplicationLogic.h>
 #include <vtkMRMLSliceLayerLogic.h>
@@ -1111,8 +1106,15 @@ vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform(
   resampledCurveNode->SetCurveTypeToLinear();
   resampledCurveNode->SetControlPointPositionsWorld(sampledPoints);
 
+  vtkPoints * resampledCurvePointsWorld = resampledCurveNode->GetCurvePointsWorld();
+  if (resampledCurvePointsWorld == nullptr || resampledCurvePointsWorld->GetNumberOfPoints() < 3)
+  {
+    vtkErrorMacro("vtkMRMLSliceLogic::CurvedPlanarReformationComputeStraighteningTransform failed: "
+                  "Not enough resampled curve points");
+    return false;
+  }
   vtkSmartPointer<vtkPlane> curveNodePlane = vtkSmartPointer<vtkPlane>::New();
-  vtkSlicerMarkupsLogic::GetBestFitPlane(resampledCurveNode, curveNodePlane);
+  vtkAddonMathUtilities::FitPlaneToPoints(resampledCurvePointsWorld, curveNodePlane);
 
   // Z axis (from first curve point to last, this will be the straightened curve long axis)
   double curveStartPoint[3] = { 0.0, 0.0, 0.0 };
